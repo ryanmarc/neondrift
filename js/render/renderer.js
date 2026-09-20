@@ -18,7 +18,7 @@ const COLOR = {
   tireMark: "rgba(165,190,245,.16)",
   startLine: "rgba(232,240,255,.16)",
   ghostBody: "rgba(47,227,255,.30)", ghostGlow: "rgba(47,227,255,.07)",
-  rivalBody: "rgba(255,47,158,.45)", rivalGlow: "rgba(255,47,158,.10)", rivalTag: "rgba(255,47,158,.85)",
+  rivalBody: "rgba(255,47,158,.45)", rivalGlow: "rgba(255,47,158,.10)",
   offTint: "rgba(255,47,158,.10)",
 };
 const EDGES = [[1, COLOR.ice], [-1, COLOR.rose]];   // [side, colour]
@@ -98,8 +98,8 @@ export function draw(dt, alpha) {
   const gp = ghostAt(race.time);
   if (gp) {
     const rival = ghost.rival;
+    // a rival is rose, your own ghost ice; the HUD's "vs" line carries the name
     drawCar(gp.x, gp.y, gp.a, rival ? COLOR.rivalBody : COLOR.ghostBody, rival ? COLOR.rivalGlow : COLOR.ghostGlow, true);
-    if (rival) drawNameTag(gp.x, gp.y, rival.name);
   }
 
   drawPlume();
@@ -209,18 +209,6 @@ function drawPlume() {
       cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
     }
   }
-}
-
-// A name above the rival ghost, kept upright and at a constant screen size
-// whatever the camera's zoom and rotation.
-function drawNameTag(x, y, name) {
-  cx.save();
-  cx.translate(x, y); cx.rotate(-camera.a); cx.scale(1 / camera.z, 1 / camera.z);
-  cx.font = "600 12px 'Chakra Petch', ui-monospace, monospace";
-  cx.textAlign = "center"; cx.textBaseline = "bottom";
-  cx.fillStyle = COLOR.rivalTag; cx.shadowColor = COLOR.rose; cx.shadowBlur = 8;
-  cx.fillText(name, 0, -18);
-  cx.restore();
 }
 
 function drawCar(x, y, a, body, glow, isGhost) {

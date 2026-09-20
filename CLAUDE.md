@@ -78,7 +78,7 @@ relatively, or inline it as a `data:` URI.
   progress]` at 30Hz into `localStorage`. Progress is stored so the live delta
   can compare times at the same point on track rather than the same timestamp.
 - **Rival ghost.** Tapping a leaderboard row fetches that run's recording and
-  races it *instead of* your own ghost (drawn in rose with a name tag); the
+  races it *instead of* your own ghost (drawn in rose, no label — the HUD names them); the
   live delta, the "vs" line and the end-screen comparison follow it. Your own
   best still saves as usual. Remembered per track in `neondrift:t<id>:rival`.
 
