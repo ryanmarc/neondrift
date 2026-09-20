@@ -270,8 +270,9 @@ Facts that the design depends on:
   UI reports `feasible` only when off-road time is exactly zero.
 - **Horizon 120 steps (1s) beat both shorter and longer.** Longer horizons
   score the released rollout over so many steps that every option looks bad.
-- **A long hold is one ≥ `chargeUp`** — that's when traction breaks. Those get
-  the full entry/exit marker pair; shorter steering taps get small dots.
+- **A long hold is one ≥ `chargeUp`** — that's when traction breaks. Only those
+  are drawn, as the entry/exit marker pair. Shorter steering taps are still in
+  the marker data (`long: false`) but not drawn; they cluttered the corners.
 - **The whole search takes ~7s** on a laptop and runs in a module worker; the
   result is cached in localStorage under `neondrift:t<id>:line:v<LINE_VERSION>-<physics hash>`,
   so changing any `T` constant or bumping `LINE_VERSION` recomputes it.

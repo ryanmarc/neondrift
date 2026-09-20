@@ -163,24 +163,19 @@ function drawGuide(s, col, dashed) {
   cx.restore();
 }
 
-// Optimal-line markers. A long hold (a real drift) gets a line across the road
-// plus a dot where the car was: green to press, white dashed to release. Short
-// steering taps are just small dots so they don't drown the corners out.
+// Optimal-line markers. Only holds long enough to break traction (a real
+// drift) are shown: a line across the road plus a dot where the car was, green
+// to press, white dashed to release. Short steering taps are in the data too
+// but deliberately not drawn — they cluttered the corners.
 function drawLineMarkers(S, inView) {
   const lap = clamp(car.lap, 1, LAPS);
   for (const m of line.markers) {
-    if (m.lap !== lap || !inView(m.x, m.y)) continue;
+    if (!m.long || m.lap !== lap || !inView(m.x, m.y)) continue;
     const col = m.type === "press" ? COLOR.guideEntry : COLOR.paper;
-    if (m.long) {
-      drawGuide(S[m.idx], col, m.type === "release");
-      cx.fillStyle = col; cx.shadowColor = col; cx.shadowBlur = 12;
-      cx.beginPath(); cx.arc(m.x, m.y, 7, 0, Math.PI * 2); cx.fill();
-      cx.shadowBlur = 0;
-    } else {
-      cx.globalAlpha = 0.55; cx.fillStyle = col;
-      cx.beginPath(); cx.arc(m.x, m.y, 3.5, 0, Math.PI * 2); cx.fill();
-      cx.globalAlpha = 1;
-    }
+    drawGuide(S[m.idx], col, m.type === "release");
+    cx.fillStyle = col; cx.shadowColor = col; cx.shadowBlur = 12;
+    cx.beginPath(); cx.arc(m.x, m.y, 7, 0, Math.PI * 2); cx.fill();
+    cx.shadowBlur = 0;
   }
 }
 
