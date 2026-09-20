@@ -1,0 +1,289 @@
+# Neon Drift
+
+A one-button drift racer. No build, no dependencies, no package.json. Edit a
+file, reload.
+
+Two copies of the game live here:
+
+- **`index.html` + `style.css` + `js/`** — the working layout. Markup in
+  `index.html`, styles in `style.css`, script split by responsibility under
+  `js/`. This is where changes go.
+- **`neon-drift.html`** — the original single-file version, preserved as-is. It
+  is the portable/artifact-friendly build and is not kept in sync automatically.
+
+## Running it
+
+Serve it:
+
+    python3 -m http.server 8000
+
+Then open http://localhost:8000/index.html (or `/neon-drift.html` for the
+single-file original).
+
+Serve it rather than opening the file from disk — `localStorage` (used for ghosts
+and best times) behaves inconsistently under `file://` in some browsers.
+
+## URL params
+
+- `?seed=2026-12-25` — force a specific track. Any string works; it is only ever
+  hashed into the PRNG seed.
+- `?seed=random` — a new track every load.
+- `?guides` — show the drift guide markers (corner entry/exit hints).
+
+## Constraints — keep these
+
+**No external assets.** Everything ships inside the project, and the single-file
+`neon-drift.html` must stay self-contained:
+
+- **Audio is synthesized at runtime** via Web Audio — oscillators, a generated
+  noise buffer, biquad filters. There are no `.wav`/`.mp3` files and there should
+  not be. If you want a new sound, build it from nodes.
+- **Graphics are drawn, not loaded.** Everything visual is canvas drawing. No
+  image files, no sprite sheets, no remote images.
+- **No JS libraries.** No bundler, no `package.json`, no `node_modules`.
+- **One exception:** the Google Fonts `<link>` for Chakra Petch. It has a real
+  fallback stack, so the game still works if it fails to load.
+
+Two reasons this rule holds:
+
+1. **The published-page CSP blocks almost everything else, silently.** When this
+   is hosted as a Claude artifact, remote images, audio files, and scripts from
+   any host other than a short allowlist are refused with no error — the feature
+   just quietly doesn't work. A sample-based sound would play fine locally and be
+   dead on the published page.
+2. **Portability.** The file can be emailed, dropped on any static host, or
+   opened from disk with nothing else alongside it.
+
+If you genuinely need an external asset, inline it as a `data:` URI rather than
+linking it, and keep the file under 16MB.
+
+## Game mechanics
+
+- **One input.** Hold either screen half (or left/right arrow) to turn. That's it.
+- **Holding breaks traction.** `chargeUp` seconds of holding drops the lateral
+  grip ceiling from `gripMax` to `gripSlide` and the back steps out. Releasing
+  restores the ceiling over `chargeDown`, but the sideways momentum already in
+  the car still has to bleed off — that's what makes the slide persist.
+- **Sliding trades speed for boost.** Top speed scales down with slip angle
+  (`slipCost`); drifting fills the boost meter.
+- **Boost has no separate button.** It fires automatically whenever you stop
+  steering and have any charge. There is deliberately no activation threshold.
+- **Chain multiplier.** Drifting cleanly builds a multiplier to ×4 which
+  multiplies the boost *fill rate*. Touching the track edge resets it to ×1.
+  Breaks above ×1.4 show a "LOST" readout and play a cue; below that they're
+  silent on purpose, so minor scrapes aren't noisy.
+- **Off-track** costs drag and top speed and kills the multiplier, but never
+  resets your position — punish flow, not progress.
+- **3 laps**, ~45–55s total. 1.8s countdown (`T_TICK`), during which physics, the
+  clock and ghost playback are all frozen, so the countdown costs no lap time.
+- **Ghost** is your best run on this exact track, recorded as `[x, y, angle,
+  progress]` at 30Hz into `localStorage`. Progress is stored so the live delta
+  can compare times at the same point on track rather than the same timestamp.
+
+## Architecture
+
+### Module layout (`index.html` build)
+
+ES modules, loaded from `<script type="module" src="js/main.js">`. Dependencies
+point one way — `ui` → `game` → `track`/`render`/`audio` → `config`/`core` —
+and the game layer never imports the DOM or audio code: it emits events on a
+tiny bus (`core/events.js`) and `ui/hud.js` and `audio/sfx.js` subscribe.
+That is what keeps the graph acyclic; keep it that way when adding features.
+
+```
+js/main.js              entry: loadTrack, resize, run
+js/core/    math.js     clamp, lerp, TAU, wrapAngle
+            random.js   mulberry32, hashStr
+            events.js   on(name, fn) / emit(name, payload) — event list at top of file
+            storage.js  localStorage that never throws
+            dom.js      $(id)
+js/config/  params.js   URL params, TODAY, INITIAL_SEED, GUIDES_FLAG
+            tuning.js   T, CAM, GUIDE, LAPS, PHYSICS_DT, GHOST_HZ, T_TICK, T_GO, road size
+js/track/   generator.js  trackFromAmps, buildTrack(rng) — pure
+            track.js      `track` {seed, id, samples}, loadTrackGeometry, nearest
+            guides.js     `guides` {flag, visible, list}, rebuildGuides
+js/game/    state.js    `car`, `race`, resetRace
+            ghost.js    `ghost` {data, bestTime}, loadGhost, commitRun, clearGhost, ghostAt…
+            physics.js  step(dt) — emits boost / chain-break / off-track
+            race.js     loadTrack, start, tick(now), run — the per-frame orchestration
+js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
+js/render/  camera.js   `camera`, resetCamera, updateCamera
+            renderer.js resize, draw(dt, alpha)
+js/audio/   sfx.js      unlock, update, isMuted, toggleMute; subscribes to game events
+js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
+            controls.js buttons and the R key
+            devpanel.js dev panel; also puts `window.neon` up for console poking
+```
+
+Conventions:
+
+- **Shared mutable state lives in a handful of exported objects** (`car`,
+  `race`, `track`, `ghost`, `guides`, `camera`) that are mutated in place.
+  Module bindings are read-only across files, so don't export a bare `let`
+  expecting another module to assign it.
+- **Physics and the loop don't know about the DOM or audio.** Add a new
+  reaction (a particle burst, a new sound) by subscribing to an event, not by
+  importing the UI or SFX module into the game layer.
+- **`tick(now)` is the whole frame** and is exported so a run can be driven
+  with synthetic timestamps. Chrome pauses `requestAnimationFrame` in hidden
+  tabs; from the console, `neon.start(); neon.tick(t)` in a loop still works.
+- The dev panel is one import line in `main.js` plus the marked blocks in
+  `index.html` and `style.css`.
+
+### Order within the original single file
+
+`neon-drift.html` has the same logic in one `<script>`, in this order:
+
+1. **Track generation** — seeded PRNG (mulberry32) → sum of sine harmonics →
+   closed loop → arc-length resampled to a 12px-spaced centerline.
+2. **`loadTrack(seed)`** — rebuilds track, geometry hash, storage keys, ghost.
+   Called at startup and by the dev panel. Everything seed-derived lives here.
+3. **Physics** (`step`) — fixed 120Hz, accumulator-driven.
+4. **Render** (`draw`) — interpolates between physics steps.
+5. **Audio** (`SFX`) — Web Audio, all synthesized, no files.
+
+### Key invariants
+
+- **Physics is fixed 120Hz; rendering interpolates.** `car.px/py/pa` hold the
+  previous step's pose and `draw()` lerps by `acc/(1/120)`. Remove this and the
+  car visibly stutters on any display that isn't a multiple of 120Hz.
+- **Ghosts are keyed to track geometry, not the date.** `hashTrack()` hashes the
+  sampled centerline. Change the generator and every seed produces a new id, so
+  stale ghosts can never appear on a track they weren't set on. Don't "simplify"
+  this back to a date key.
+- **Camera smoothing must be framerate-independent.** Use
+  `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
+- **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
+  updated via `setTargetAtTime`. Per-frame node creation causes crackling.
+- **Audio must unlock inside a real tap handler.** iOS refuses to start an
+  `AudioContext` otherwise, and deferring it even one frame fails. `SFX.unlock()`
+  is called from the play, restart and mute click handlers.
+- **Feed the audio silence when not racing.** `step()` stops at the finish, so
+  `car.drift` and velocity freeze at their last values. Passing those stale
+  numbers to `SFX.update()` leaves the skid playing forever. `draw()`'s caller
+  gates on `running && cd<=0`.
+- **Respect the safe-area insets.** `:root` carries
+  `padding-top/bottom: env(safe-area-inset-*)` and the viewport tag uses
+  `viewport-fit=cover`. Phones draw edge-to-edge under translucent system bars;
+  without this the HUD slides under the notch and the home indicator.
+- **Capture `prevBest` before overwriting `bestTime`.** The end screen's delta
+  needs the old value; overwriting first silently loses it.
+
+## Tuning constants
+
+### `T` — car physics
+
+| Knob | Does what |
+|---|---|
+| `gripMax` / `gripSlide` | Lateral grip ceiling with traction / once it breaks. Lower `gripSlide` = looser back end. |
+| `stiffness` | How fast small slip angles are corrected while the tires still bite. |
+| `chargeUp` / `chargeDown` | Seconds for traction to break while holding / for the ceiling to return after release. |
+| `align` | Self-aligning torque gain. Sets the *settled* drift angle (~50°). |
+| `alignFall` / `alignFloor` | Where the aligning force peaks and how much survives at big slip. The falloff is what lets a drift hold. |
+| `zeta` | Yaw damping ratio. **Only affects how the car settles**, not the drift angle — natural frequency is derived from `align` and `zeta` together so equilibrium is invariant. Lower = more overshoot. |
+| `turn` | Steering rate (rad/s). |
+| `slipCost` | How much top speed a sideways car loses. |
+| `slipLagIn` / `slipLagOut` | Seconds to bleed speed off entering a slide / regain it on exit. Asymmetric on purpose. |
+| `scrub` | Extra forward drag proportional to sideways velocity. |
+| `driftMin` | Slip angle below which you aren't considered drifting (no boost fill, no skid sound). |
+| `accel` / `maxSpeed` | Base thrust and top speed. |
+| `boostAccel` / `boostSpeed` | Thrust and top speed while boosting. |
+| `boostFill` / `boostDrain` / `boostCap` | Boost economy. |
+| `offDrag` | Drag while off-track. |
+| `zoomRange` / `zoomLag` | How far the view pulls back at speed, and seconds to follow a speed change. Set `zoomRange` to 0 to lock the zoom. |
+
+### `CAM` — camera feel
+
+| Knob | Does what |
+|---|---|
+| `face` | 0 = follow direction of travel, 1 = follow the nose. Low values stop drifts whipping the view. |
+| `freq` / `zeta` | Chase spring stiffness and damping. |
+| `leadLag` | Smooths the look-ahead vector. Without it the camera stalls on every steering tap, because look-ahead is `velocity × lead` and velocity drops when a slide starts. |
+| `followLag` | Seconds for the camera position to catch up to its target. |
+| `spanFixed` / `spanChase` | World pixels across the short viewport edge, per camera mode. |
+| `leadFixed` / `leadChase` | Look-ahead distance in seconds of velocity, per camera mode. |
+
+The fixed camera's world span scales with viewport size (clamped to 1.85×), so a
+desktop sees ~3.4× the track area a phone does. Without that, a bigger screen
+just magnified everything instead of showing more.
+
+### `GUIDE` — drift marker heuristic (behind `?guides`)
+
+Green line = start holding, dashed white = release. **These are a heuristic, not
+a solved optimal line** — each corner is treated independently, so they ignore
+the real trade of sacrificing one corner for speed down the following straight.
+Beating them on some corners is expected.
+
+| Knob | Does what |
+|---|---|
+| `minRadius` | Corner-detection threshold. Physics says `v²/a` ≈ 414px, but curvature smoothing flattens peaks, so this is calibrated to 520. Across 40 tracks that yields ~6 corners each. |
+| `lead` / `trail` | Seconds before the corner to commit / before its end to release. Derived from `chargeUp` and `slipLagOut`. |
+| `minCorner` | Ignore wiggles shorter than this (px). |
+
+## Input detection
+
+Control hints adapt via `matchMedia("(pointer: coarse)")`, then correct
+themselves the moment the player actually uses a key or touches the screen.
+Deliberately not user-agent sniffing — that gets touchscreen laptops and
+keyboard tablets wrong.
+
+## localStorage keys
+
+- `neondrift:t<trackId>:best` — best time for that track geometry
+- `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
+- `neondrift:mute` — sound preference, global
+
+Wrap every read in try/catch and render correctly when storage is empty.
+
+## Decisions worth not re-litigating
+
+- **Grip is a friction ceiling, not an exponential decay.** The original model
+  tied grip to whether the button was held, so releasing snapped the slide away
+  instantly. Now grip limits how much lateral velocity can be corrected per
+  second, so a slide persists and bleeds off naturally.
+- **Aligning force peaks then fades.** Linear-in-slip-angle meant the car yanked
+  itself straight harder the more sideways it got — backwards from real tires.
+- **No boost activation threshold.** A minimum charge gate was tried and removed:
+  it let sub-threshold charge bank up, which *rewarded* tap-spamming.
+- **Track generator uses sine harmonics, not radial control points.** Points at
+  monotonically increasing angles almost guarantee same-direction corners only.
+  Generator rejects layouts with min radius < 185px or fewer than 4 direction
+  changes.
+- **Audio levels were solved, not eyeballed.** Gains are balanced by A-weighted
+  loudness through a phone-speaker rolloff. Raw gain numbers are misleading: a
+  Q=12 bandpass passes ~75Hz of bandwidth, so `0.4` of that is far quieter than
+  `0.1` of a square wave. Rebalance by measuring, not by ear alone.
+- **Keep low sounds above ~140Hz.** Phone speakers distort trying to reproduce
+  lower, and that distortion is heard as rasp. The boost thump was lowered twice
+  chasing "more subtle" and got worse each time; raising it fixed it.
+- **The skid is a resonance, not a hiss.** A real tire squeals because the tread
+  grabs and releases — stick-slip. It's a high-Q bandpass (pitched, rings) plus a
+  harmonic plus a low scrubbing roar, with an LFO wavering the centre frequency.
+  Dead-steady pitch is the clearest tell that a sound is synthetic. A wide, low-Q
+  bandpass is just filtered noise and sounds like wind.
+- **Swept filters read as motion; static filters read as noise.** The boost burst
+  sweeps its bandpass 2600→700Hz, which sounds like air moving past. The same
+  noise through a fixed highpass sounded like rasp.
+- **The boost plume is real position history.** Exhaust puffs are dropped in
+  world space at the tailpipe and left there, so the trail curves along the path
+  actually travelled. Don't "simplify" it back to a line drawn along the heading —
+  that swings like a searchlight during a drift.
+- **The chain multiplier lives next to the boost bar, not screen centre.** It was
+  centred and flashing; it's a boost fill-rate multiplier, so showing it beside
+  the bar it affects explains itself without a tutorial.
+
+## Dev panel (temporary)
+
+In the module build: the `DEV PANEL START/END` block in `index.html`, the
+`DEV PANEL CSS START/END` block in `style.css`, and `js/ui/devpanel.js` plus
+its import line in `js/main.js`. In `neon-drift.html` the same three blocks are inline, the
+script one marked `DEV PANEL SCRIPT START/END`. Deleting them is clean — nothing
+else references them.
+
+## Not built yet
+
+- **Daily leaderboard.** Needs shared storage. The geometry hash is the natural
+  key. Note the seed uses *local* midnight — switch to UTC for a real leaderboard.
+- **Engine sound.** Deliberately skipped; it's more work than everything else in
+  the audio module combined. Detuned sawtooths with a speed-driven lowpass.
+- **Track selection / multiple tracks.** `loadTrack(seed)` already supports it.

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Neon Drift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+
+  <div class="hud" id="topbar">
+    <div>
+      <div id="clock">0.00</div>
+      <div id="lap">Lap 1 of 3</div>
+    </div>
+    <div id="rightstack">
+      <div id="delta"></div>
+      <div id="best"></div>
+    </div>
+  </div>
+
+  <div class="hud" id="meterwrap">
+    <div id="chainrow"><div id="chain"></div></div>
+    <div id="meter"><div id="fill"></div></div>
+    <div id="meterlabel">BOOST</div>
+  </div>
+
+  <div id="countdown"></div>
+
+  <button class="btn" id="restart">Restart</button>
+  <button class="btn" id="camtoggle">Camera: fixed</button>
+  <button class="btn" id="mute">Sound: on</button>
+  <button class="btn" id="guidetoggle">Guides: on</button>
+
+  <div id="overlay">
+    <div>
+      <h1 id="title">NEON<br>DRIFT</h1>
+      <div id="seed"></div>
+    </div>
+    <div id="howto">
+      <p id="rule">Hold <b>either side</b> of the screen to turn.</p>
+      <p id="aside">That's the whole game.</p>
+      <p id="detail">Keep holding and the back steps out. Sliding costs you speed but fills the boost meter. Let go and the car straightens itself, spending whatever boost you earned.</p>
+    </div>
+    <div id="result"></div>
+    <button id="go">TAP TO RACE</button>
+    <button id="clearghost">Clear saved ghost</button>
+
+    <!-- DEV PANEL START — temporary test controls. To remove: delete this block,
+         the #devpanel CSS block, and the DEV PANEL script block at the end. -->
+    <div id="devpanel">
+      <label id="devGuidesRow"><input type="checkbox" id="devGuides"> Show drift guides</label>
+      <div id="devSeedRow">
+        <input type="text" id="devSeed" placeholder="seed" autocomplete="off" spellcheck="false">
+        <button id="devLoad" type="button">Load</button>
+        <button id="devRandom" type="button">Random</button>
+      </div>
+    </div>
+    <!-- DEV PANEL END -->
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
