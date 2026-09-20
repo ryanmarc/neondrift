@@ -9,7 +9,7 @@ import * as identity from "../net/identity.js";
 import { fmt } from "./hud.js";
 
 const $board = $("board"), $list = $("boardlist"), $me = $("boardme"), $status = $("boardstatus");
-const $namerow = $("namerow"), $namebox = $("namebox"), $post = $("postname"), $skip = $("skipname");
+const $namerow = $("namerow"), $namehead = $("namehead"), $namebox = $("namebox"), $post = $("postname"), $skip = $("skipname");
 const $pairstart = $("pairstart"), $pairclaim = $("pairclaim"), $rename = $("rename"), $pairbox = $("pairbox");
 
 // The identity can appear (first post) or change (pairing) at any time, so
@@ -45,7 +45,8 @@ function render() {
 
   const renaming = $pairbox.dataset.mode === "rename";
   $namerow.classList.toggle("on", !!board.pending || renaming);
-  if (board.pending && !renaming) $post.textContent = "Post " + fmt(board.pending.time);
+  if (renaming) { $namehead.textContent = "Change your name"; $post.textContent = "Save"; }
+  else if (board.pending) { $namehead.textContent = "Post " + fmt(board.pending.time) + " to the leaderboard"; $post.textContent = "Post"; }
 
   $rename.style.display = identity.getName() ? "" : "none";
   $pairstart.style.display = identity.getSecret() ? "" : "none";
@@ -85,7 +86,6 @@ $rename.addEventListener("click", e => {
   e.stopPropagation();
   $pairbox.dataset.mode = "rename";
   $namebox.value = identity.getName() || "";
-  $post.textContent = "Save name";
   render();
   $namebox.focus();
 });
