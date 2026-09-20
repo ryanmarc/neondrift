@@ -52,17 +52,20 @@
         <p id="detail">Keep holding and the back steps out. Sliding costs you speed but fills the boost meter. Let go and the car straightens itself, spending whatever boost you earned.</p>
       </div>
       <div id="result"></div>
+      <div id="namerow">
+        <div id="namehead">Post your time to the leaderboard</div>
+        <div id="namefields">
+          <input type="text" id="namebox" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
+          <button type="button" id="postname">Post</button>
+        </div>
+        <button type="button" id="skipname" class="link">Not now</button>
+      </div>
       <button id="go">TAP TO RACE</button>
       <div id="board">
         <div id="boardhead">LEADERBOARD</div>
         <ol id="boardlist"></ol>
         <div id="boardme"></div>
         <div id="boardstatus"></div>
-        <div id="namerow">
-          <input type="text" id="namebox" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
-          <button type="button" id="postname">Post time</button>
-          <button type="button" id="skipname" class="link">Not now</button>
-        </div>
         <div id="devices">
           <button type="button" class="link" id="pairstart">Play on another device</button>
           <button type="button" class="link" id="pairclaim">Enter a code</button>
