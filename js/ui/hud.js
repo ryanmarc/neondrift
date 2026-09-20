@@ -151,12 +151,13 @@ function showResult({ time, prevBest, isPB }) {
   $result.innerHTML = '<span class="big' + (isPB ? ' pb' : '') + '">' + fmt(time) + '</span>' + line;
   $go.textContent = "RACE AGAIN";
   syncClear();
+  $overlay.classList.add("done");          // recap: hide the how-to
   $overlay.classList.remove("gone");
 }
 
 // ---------- wiring ----------
 
-on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); });
+on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); $overlay.classList.remove("done"); });
 on("race-start", () => $overlay.classList.add("gone"));
 on("race-finish", showResult);
 on("input-mode", setInputMode);
