@@ -1,15 +1,8 @@
 # Neon Drift
 
 A one-button drift racer. No build, no dependencies, no package.json. Edit a
-file, reload.
-
-Two copies of the game live here:
-
-- **`index.html` + `style.css` + `js/`** — the working layout. Markup in
-  `index.html`, styles in `style.css`, script split by responsibility under
-  `js/`. This is where changes go.
-- **`neon-drift.html`** — the original single-file version, preserved as-is. It
-  is the portable/artifact-friendly build and is not kept in sync automatically.
+file, reload. Markup in `index.html`, styles in `style.css`, script split by
+responsibility as ES modules under `js/`.
 
 ## Running it
 
@@ -17,8 +10,7 @@ Serve it:
 
     python3 -m http.server 8000
 
-Then open http://localhost:8000/index.html (or `/neon-drift.html` for the
-single-file original).
+Then open http://localhost:8000/index.html
 
 Serve it rather than opening the file from disk — `localStorage` (used for ghosts
 and best times) behaves inconsistently under `file://` in some browsers.
@@ -40,8 +32,7 @@ has meant exactly this twice.
 
 ## Constraints — keep these
 
-**No external assets.** Everything ships inside the project, and the single-file
-`neon-drift.html` must stay self-contained:
+**No external assets.** Everything ships inside the project:
 
 - **Audio is synthesized at runtime** via Web Audio — oscillators, a generated
   noise buffer, biquad filters. There are no `.wav`/`.mp3` files and there should
@@ -54,16 +45,15 @@ has meant exactly this twice.
 
 Two reasons this rule holds:
 
-1. **The published-page CSP blocks almost everything else, silently.** When this
-   is hosted as a Claude artifact, remote images, audio files, and scripts from
-   any host other than a short allowlist are refused with no error — the feature
-   just quietly doesn't work. A sample-based sound would play fine locally and be
-   dead on the published page.
-2. **Portability.** The file can be emailed, dropped on any static host, or
-   opened from disk with nothing else alongside it.
+1. **Restrictive hosts block remote assets silently.** Behind a strict content
+   security policy, remote images, audio files and scripts from other hosts are
+   refused with no error — the feature just quietly doesn't work. A sample-based
+   sound would play fine locally and be dead on such a page.
+2. **Portability.** The folder can be dropped on any static host with nothing
+   else alongside it.
 
-If you genuinely need an external asset, inline it as a `data:` URI rather than
-linking it, and keep the file under 16MB.
+If you genuinely need an asset, put the file in the repo and reference it
+relatively, or inline it as a `data:` URI.
 
 ## Game mechanics
 
@@ -90,7 +80,7 @@ linking it, and keep the file under 16MB.
 
 ## Architecture
 
-### Module layout (`index.html` build)
+### Module layout
 
 ES modules, loaded from `<script type="module" src="js/main.js">`. Dependencies
 point one way — `ui` → `game` → `track`/`render`/`audio` → `config`/`core` —
@@ -153,17 +143,18 @@ Conventions:
 - The dev panel is one import line in `main.js` plus the marked blocks in
   `index.html` and `style.css`.
 
-### Order within the original single file
+### Boot order
 
-`neon-drift.html` has the same logic in one `<script>`, in this order:
+`main.js` imports everything, then runs, in this order:
 
-1. **Track generation** — seeded PRNG (mulberry32) → sum of sine harmonics →
-   closed loop → arc-length resampled to a 12px-spaced centerline.
-2. **`loadTrack(seed)`** — rebuilds track, geometry hash, storage keys, ghost.
-   Called at startup and by the dev panel. Everything seed-derived lives here.
-3. **Physics** (`step`) — fixed 120Hz, accumulator-driven.
-4. **Render** (`draw`) — interpolates between physics steps.
-5. **Audio** (`SFX`) — Web Audio, all synthesized, no files.
+1. **`loadTrack(seed)`** — seeded PRNG (mulberry32) → sum of sine harmonics →
+   closed loop → arc-length resampled to a 12px-spaced centreline; then the
+   geometry hash, the ghost for that hash, and the car on the start line.
+   Called again by the dev panel whenever a new seed is entered.
+2. **`resize()`** — canvas to viewport.
+3. **`armAutoplay()`** — audio context, resumed on the first interaction.
+4. **`run()`** — the `requestAnimationFrame` loop: fixed 120Hz physics via an
+   accumulator, then render (interpolated between steps), then HUD.
 
 ### Key invariants
 
@@ -362,11 +353,10 @@ Wrap every read in try/catch and render correctly when storage is empty.
 
 Hidden unless `?dev` is on the URL (or `DEV_FLAG` is flipped in
 `config/params.js`); the module still loads so `window.neon` is always there.
-In the module build: the `DEV PANEL START/END` block in `index.html`, the
+It is the `DEV PANEL START/END` block in `index.html`, the
 `DEV PANEL CSS START/END` block in `style.css`, and `js/ui/devpanel.js` plus
-its import line in `js/main.js`. In `neon-drift.html` the same three blocks are inline, the
-script one marked `DEV PANEL SCRIPT START/END`. Deleting them is clean — nothing
-else references them.
+its import line in `js/main.js`. Deleting them is clean — nothing else
+references them.
 
 ## Not built yet
 
