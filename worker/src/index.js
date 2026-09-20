@@ -69,7 +69,7 @@ async function postRun(body, env) {
   const improved = best == null || r.time < best;
   if (improved) await db.upsertRun(env.DB, { trackId: body.trackId, playerId, time: r.time, inputs: body.inputs, ghost: body.ghost, now });
   const rank = await db.rankOf(env.DB, body.trackId, improved ? r.time : best);
-  return json({ accepted: true, improved, time: r.time, rank });
+  return json({ accepted: true, improved, time: r.time, rank, rankCap: db.RANK_CAP });
 }
 
 async function getBoard(url, env) {
@@ -88,7 +88,7 @@ async function getBoard(url, env) {
       if (row) me = { rank: await db.rankOf(env.DB, trackId, row.time), time: row.time, name: row.name, tag: player.slice(0, 4) };
     }
   }
-  return json({ top, me });
+  return json({ top, me, rankCap: db.RANK_CAP });
 }
 
 async function postName(body, env) {

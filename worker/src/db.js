@@ -34,9 +34,17 @@ export async function upsertRun(db, { trackId, playerId, time, inputs, ghost, no
   ).bind(trackId, playerId, time, JSON.stringify(inputs), JSON.stringify(ghost), now).run();
 }
 
-/** 1-based rank a time would have on the track. */
+export const RANK_CAP = 100;
+
+/**
+ * 1-based rank a time would have on the track, exact up to RANK_CAP. Beyond
+ * that it returns RANK_CAP + 1, meaning "worse than 100th": counting is a walk
+ * over every faster row, so the LIMIT bounds what a deep rank can cost.
+ */
 export async function rankOf(db, trackId, time) {
-  const row = await db.prepare("SELECT COUNT(*) AS n FROM runs WHERE track_id = ?1 AND time < ?2").bind(trackId, time).first();
+  const row = await db.prepare(
+    "SELECT COUNT(*) AS n FROM (SELECT 1 FROM runs WHERE track_id = ?1 AND time < ?2 LIMIT ?3)"
+  ).bind(trackId, time, RANK_CAP).first();
   return row.n + 1;
 }
 

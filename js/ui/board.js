@@ -31,8 +31,9 @@ function render() {
   const mine = r => r.tag === myTag && r.name === myName;
   $list.innerHTML = board.top.map((r, i) => row(i + 1, r.name, r.tag, r.time, mine(r))).join("");
   const inTop = board.top.some(mine);
+  const rankLabel = r => (r > board.rankCap ? board.rankCap + "+" : String(r));
   $me.innerHTML = board.me && !inTop
-    ? '<span class="rank">' + board.me.rank + "</span>" + who(board.me.name || myName || "", board.me.tag) + '<span class="time">' + fmt(board.me.time) + "</span>"
+    ? '<span class="rank">' + rankLabel(board.me.rank) + "</span>" + who(board.me.name || myName || "", board.me.tag) + '<span class="time">' + fmt(board.me.time) + "</span>"
     : "";
   $me.style.display = $me.innerHTML ? "flex" : "none";
 
