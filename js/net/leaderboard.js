@@ -10,8 +10,8 @@ import * as identity from "./identity.js";
 export const board = {
   status: api.apiEnabled() ? "loading" : "off",   // off | loading | ready | unavailable
   top: [],            // [{ name, tag, time, at }]
-  me: null,           // { rank, time, name, tag } or null
-  count: 0,
+  me: null,           // { rank, time, name, tag } or null; rank > rankCap means "worse than rankCap"
+  rankCap: 100,
   pending: null,      // a PB waiting for a name before it can be posted
   lastSubmit: null,   // { accepted, improved, rank, reason } from the last post
   pairing: null,      // { code, expires } while a pairing code is showing
@@ -27,7 +27,7 @@ export async function refreshBoard() {
   const data = await api.fetchBoard(id, await identity.playerId());
   if (id !== track.id) return;                 // a different track loaded meanwhile
   if (!data || data.error) { board.status = "unavailable"; changed(); return; }
-  board.top = data.top; board.me = data.me; board.count = data.count; board.status = "ready";
+  board.top = data.top; board.me = data.me; board.rankCap = data.rankCap || 100; board.status = "ready";
   changed();
 }
 

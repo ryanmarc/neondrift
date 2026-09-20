@@ -1,4 +1,7 @@
 // The handful of D1 statements the API needs. Each takes the D1 binding.
+// D1's free tier bills rows read, and an index entry counts as a row, so every
+// statement here is either a primary-key lookup or an index walk that stops
+// early. Check with EXPLAIN QUERY PLAN before changing one.
 
 export async function upsertPlayer(db, id, name, now) {
   await db.prepare(
@@ -16,6 +19,13 @@ export async function bestFor(db, trackId, playerId) {
   return row ? row.time : null;
 }
 
+/** The player's row on a track with their name, in one lookup; null if none. */
+export async function myRow(db, trackId, playerId) {
+  return db.prepare(
+    "SELECT r.time AS time, p.name AS name FROM runs r JOIN players p ON p.id = r.player_id WHERE r.track_id = ?1 AND r.player_id = ?2"
+  ).bind(trackId, playerId).first();
+}
+
 /** Insert or replace the player's row for the track. Caller has already checked it is faster. */
 export async function upsertRun(db, { trackId, playerId, time, inputs, ghost, now }) {
   await db.prepare(
@@ -24,9 +34,17 @@ export async function upsertRun(db, { trackId, playerId, time, inputs, ghost, no
   ).bind(trackId, playerId, time, JSON.stringify(inputs), JSON.stringify(ghost), now).run();
 }
 
-/** 1-based rank a time would have on the track. */
+export const RANK_CAP = 100;
+
+/**
+ * 1-based rank a time would have on the track, exact up to RANK_CAP. Beyond
+ * that it returns RANK_CAP + 1, meaning "worse than 100th": counting is a walk
+ * over every faster row, so the LIMIT bounds what a deep rank can cost.
+ */
 export async function rankOf(db, trackId, time) {
-  const row = await db.prepare("SELECT COUNT(*) AS n FROM runs WHERE track_id = ?1 AND time < ?2").bind(trackId, time).first();
+  const row = await db.prepare(
+    "SELECT COUNT(*) AS n FROM (SELECT 1 FROM runs WHERE track_id = ?1 AND time < ?2 LIMIT ?3)"
+  ).bind(trackId, time, RANK_CAP).first();
   return row.n + 1;
 }
 
@@ -38,9 +56,9 @@ export async function topRuns(db, trackId, n) {
   return results;
 }
 
-export async function countRuns(db, trackId) {
-  const row = await db.prepare("SELECT COUNT(*) AS n FROM runs WHERE track_id = ?1").bind(trackId).first();
-  return row.n;
+/** Drop expired codes. Range scan on the expires index: only dead rows are touched. */
+export async function purgeCodes(db, now) {
+  await db.prepare("DELETE FROM pair_codes WHERE expires < ?1").bind(now).run();
 }
 
 export async function createCode(db, code, secret, expires) {
