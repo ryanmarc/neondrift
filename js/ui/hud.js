@@ -101,6 +101,7 @@ function refreshLine() {
   }
   $line.textContent = text;
   $line.style.display = text ? "block" : "none";
+  $go.disabled = line.status === "computing";   // no racing until the line is ready
 }
 
 // ---------- control hint ----------

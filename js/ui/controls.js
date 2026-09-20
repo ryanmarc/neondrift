@@ -2,16 +2,19 @@
 
 import { $ } from "../core/dom.js";
 import { guides } from "../track/guides.js";
-import { ensureLine } from "../sim/line.js";
+import { line, ensureLine } from "../sim/line.js";
 import { camera } from "../render/camera.js";
 import { start } from "../game/race.js";
 import * as SFX from "../audio/sfx.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
-$("go").addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); start(); });
-$("restart").addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); start(); });
-addEventListener("keydown", e => { if (e.key === "r" || e.key === "R") start(); });
+// While the optimal line is being computed the race button is disabled (hud.js);
+// the shortcuts honour the same rule so it can't be bypassed from the keyboard.
+const canStart = () => line.status !== "computing";
+$("go").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); start(); });
+$("restart").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); start(); });
+addEventListener("keydown", e => { if ((e.key === "r" || e.key === "R") && canStart()) start(); });
 
 const $guides = $("guidetoggle");
 if (!guides.flag) $guides.style.display = "none";
