@@ -9,6 +9,8 @@ import "./audio/sfx.js";       // subscribes to game events
 import "./game/daily.js";     // rolls the daily track over at midnight UTC
 import "./ui/hud.js";          // subscribes to game events
 import "./ui/controls.js";     // wires the buttons
+import "./net/leaderboard.js";  // subscribes to track-loaded and race-finish
+import "./ui/board.js";         // the leaderboard panel
 import "./ui/devpanel.js";     // DEV PANEL — delete this line with the panel
 
 loadTrack(INITIAL_SEED);
