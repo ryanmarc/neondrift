@@ -156,6 +156,11 @@ canvas{display:block;width:100%;height:100%}
 #boardlist{list-style:none;margin:0;padding:0}
 #boardlist li,#boardme{display:flex;gap:10px;padding:6px 10px;border-radius:8px;font-variant-numeric:tabular-nums}
 #boardlist li.me,#boardme{background:rgba(47,227,255,.08);color:var(--ice)}
+#boardlist li.pick{cursor:pointer}
+#boardlist li.pick:active{background:rgba(255,47,158,.12)}
+#boardlist li.racing{background:rgba(255,47,158,.10);color:var(--rose)}
+#board .chip{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.8;align-self:center}
+#best .tag{opacity:.5;font-size:11px}
 #board .rank{min-width:2ch;opacity:.5;text-align:right;white-space:nowrap}
 #board .who{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #board .tag{opacity:.4;font-size:12px}

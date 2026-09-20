@@ -4,7 +4,7 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { board, submitPending, dismissPending, setPlayerName, startPairing, clearPairing, claimPairingCode } from "../net/leaderboard.js";
+import { board, submitPending, dismissPending, setPlayerName, startPairing, clearPairing, claimPairingCode, chooseRival } from "../net/leaderboard.js";
 import * as identity from "../net/identity.js";
 import { fmt } from "./hud.js";
 
@@ -19,8 +19,11 @@ const refreshTag = () => identity.tag().then(t => { if (t !== myTag) { myTag = t
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const who = (name, tag) => '<span class="who">' + esc(name) + '<span class="tag">#' + esc(tag) + '</span></span>';
-const row = (rank, name, tag, time, me) =>
-  '<li' + (me ? ' class="me"' : "") + '><span class="rank">' + rank + "</span>" + who(name, tag) + '<span class="time">' + fmt(time) + "</span></li>";
+const row = (rank, r, me, racing) =>
+  '<li data-id="' + esc(r.id) + '" class="' + (me ? "me " : "") + (racing ? "racing " : "") + (me ? "" : "pick") + '">'
+  + '<span class="rank">' + rank + "</span>" + who(r.name, r.tag)
+  + (racing ? '<span class="chip">racing</span>' : "")
+  + '<span class="time">' + fmt(r.time) + "</span></li>";
 
 function render() {
   $board.classList.toggle("on", board.status !== "off");
@@ -29,7 +32,8 @@ function render() {
 
   const myName = identity.getName();
   const mine = r => r.tag === myTag && r.name === myName;
-  $list.innerHTML = board.top.map((r, i) => row(i + 1, r.name, r.tag, r.time, mine(r))).join("");
+  const rivalId = board.rival && board.rival.status !== "failed" ? board.rival.id : null;
+  $list.innerHTML = board.top.map((r, i) => row(i + 1, r, mine(r), r.id === rivalId)).join("");
   const inTop = board.top.some(mine);
   const rankLabel = r => (r > board.rankCap ? board.rankCap + "+" : String(r));
   $me.innerHTML = board.me && !inTop
@@ -42,6 +46,9 @@ function render() {
   else if (board.status === "unavailable") status = "leaderboard unavailable";
   else if (!board.top.length) status = "no times yet — set the first";
   if (board.lastSubmit && !board.lastSubmit.accepted) status = "couldn't verify that run (" + (board.lastSubmit.reason || "unavailable") + ")";
+  if (board.rival && board.rival.status === "failed") status = "couldn't load that ghost — racing your own";
+  else if (board.rival && board.rival.status === "ready") status = "racing " + board.rival.name + "#" + board.rival.tag + " · tap again for your own ghost";
+  else if (board.status === "ready" && board.top.length) status = "tap a time to race that ghost";
   $status.textContent = status;
 
   const renaming = $pairbox.dataset.mode === "rename";
@@ -60,6 +67,15 @@ function render() {
     $pairbox.innerHTML = "";
   }
 }
+
+// tap a row to race that ghost; tap it again to go back to your own
+$list.addEventListener("click", e => {
+  e.stopPropagation();
+  const li = e.target.closest("li.pick");
+  if (!li) return;
+  const id = li.dataset.id;
+  chooseRival(board.rival && board.rival.id === id ? null : id);
+});
 
 // ---------- name prompt (also used for renaming) ----------
 

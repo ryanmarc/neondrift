@@ -48,6 +48,13 @@ export async function rankOf(db, trackId, time) {
   return row.n + 1;
 }
 
+/** A player's stored run on a track with its recording, for racing as a rival. One PK lookup. */
+export async function ghostFor(db, trackId, playerId) {
+  return db.prepare(
+    "SELECT r.time AS time, r.ghost AS ghost, p.name AS name FROM runs r JOIN players p ON p.id = r.player_id WHERE r.track_id = ?1 AND r.player_id = ?2"
+  ).bind(trackId, playerId).first();
+}
+
 export async function topRuns(db, trackId, n) {
   const { results } = await db.prepare(
     "SELECT r.player_id AS id, p.name AS name, r.time AS time, r.created AS at " +

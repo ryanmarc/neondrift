@@ -53,6 +53,8 @@ up how fast the meter fills; touching the edge of the road resets it.
   pressed and released, and the server replays that through the same physics
   before it believes the time. Your identity is a secret in your browser;
   "Play on another device" moves it with a six-letter code.
+- **Race the leaders.** Tap a time on the board to race that player's ghost
+  instead of your own, with the live delta against them.
 - **Adaptive music.** A synthesized synthwave loop that plays quietly on the
   menu, opens up when the race starts, and lifts while you boost. Effects and
   music have separate toggles.
@@ -279,6 +281,7 @@ means nothing saved.
 | `neondrift:t<id>:best` | best time for that track geometry |
 | `neondrift:t<id>:ghost` | ghost recording for that geometry |
 | `neondrift:t<id>:inputs` | the best run's input changes, what the leaderboard verifies |
+| `neondrift:t<id>:rival` | which leaderboard ghost you chose to race on that track |
 | `neondrift:player` | the leaderboard secret; the server only sees its hash |
 | `neondrift:name` | the display name |
 | `neondrift:mute` | sound effects on/off |
