@@ -28,6 +28,8 @@ and best times) behaves inconsistently under `file://` in some browsers.
 - `?seed=2026-12-25` — force a specific track. Any string works; it is only ever
   hashed into the PRNG seed.
 - `?seed=random` — a new track every load.
+- `?dev` — show the dev panel (seed loader, guides checkbox) on the start
+  screen. Hidden by default; `DEV_FLAG` in `config/params.js`.
 - `?guides` — show the drift guide markers. Turning guides on also computes
   the optimal line for the track (see below) and switches the markers to it.
 
@@ -336,6 +338,8 @@ Wrap every read in try/catch and render correctly when storage is empty.
 
 ## Dev panel (temporary)
 
+Hidden unless `?dev` is on the URL (or `DEV_FLAG` is flipped in
+`config/params.js`); the module still loads so `window.neon` is always there.
 In the module build: the `DEV PANEL START/END` block in `index.html`, the
 `DEV PANEL CSS START/END` block in `style.css`, and `js/ui/devpanel.js` plus
 its import line in `js/main.js`. In `neon-drift.html` the same three blocks are inline, the

@@ -3,7 +3,7 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { TODAY } from "../config/params.js";
+import { TODAY, DEV_FLAG } from "../config/params.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { car, race } from "../game/state.js";
@@ -17,6 +17,8 @@ import { line, ensureLine } from "../sim/line.js";
 const cb = $("devGuides");
 const box = $("devSeed");
 const $result = $("result"), $go = $("go");
+
+$("devpanel").classList.toggle("on", DEV_FLAG);   // hidden unless the flag is set
 
 cb.checked = guides.visible;
 cb.addEventListener("change", () => setGuidesVisible(cb.checked));
