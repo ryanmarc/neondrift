@@ -80,10 +80,15 @@ async function getBoard(url, env) {
   const top = rows.map(r => ({ name: r.name, tag: r.id.slice(0, 4), time: r.time, at: r.at }));
   let me = null;
   if (player && /^[0-9a-f]{64}$/.test(player)) {
-    const time = await db.bestFor(env.DB, trackId, player);
-    if (time != null) me = { rank: await db.rankOf(env.DB, trackId, time), time, name: await db.playerName(env.DB, player), tag: player.slice(0, 4) };
+    const inTop = rows.findIndex(r => r.id === player);
+    if (inTop >= 0) {
+      me = { rank: inTop + 1, time: rows[inTop].time, name: rows[inTop].name, tag: player.slice(0, 4) };
+    } else {
+      const row = await db.myRow(env.DB, trackId, player);          // one PK lookup
+      if (row) me = { rank: await db.rankOf(env.DB, trackId, row.time), time: row.time, name: row.name, tag: player.slice(0, 4) };
+    }
   }
-  return json({ top, me, count: await db.countRuns(env.DB, trackId) });
+  return json({ top, me });
 }
 
 async function postName(body, env) {
@@ -97,7 +102,8 @@ async function postName(body, env) {
 
 async function pairStart(body, env) {
   if (!body || !v.validSecret(body.secret)) return bad("invalid-secret");
-  const expires = Date.now() + CODE_TTL_MS;
+  const now = Date.now(), expires = now + CODE_TTL_MS;
+  await db.purgeCodes(env.DB, now);
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = randomCode();
     try { await db.createCode(env.DB, code, body.secret, expires); return json({ code, expires }); }
