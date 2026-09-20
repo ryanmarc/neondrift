@@ -10,12 +10,13 @@ import { SEED_OVERRIDE } from "../config/params.js";
 import { track } from "../track/track.js";
 import { car, race } from "../game/state.js";
 import { ghost, ghostTimeAtProgress, clearGhost } from "../game/ghost.js";
+import { line } from "../sim/line.js";
 
 const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best");
 const $fill = $("fill"), $chain = $("chain"), $meter = $("meter");
 const $countdown = $("countdown");
 const $overlay = $("overlay"), $result = $("result"), $go = $("go"), $seed = $("seed");
-const $rule = $("rule"), $clear = $("clearghost");
+const $rule = $("rule"), $clear = $("clearghost"), $line = $("line");
 
 export const fmt = t => t.toFixed(2);
 
@@ -87,6 +88,21 @@ function refreshSeed() {
     + (seedOverridden ? ' <span class="override">override</span>' : "");
 }
 
+// ---------- optimal line status ----------
+
+function refreshLine() {
+  let text = "";
+  if (line.status === "computing") {
+    text = "FINDING LINE · " + Math.round(line.progress * 100) + "%" + (line.time != null ? " · " + fmt(line.time) : "");
+  } else if (line.status === "ready") {
+    text = line.feasible ? "IDEAL LINE " + fmt(line.time) : "LINE " + fmt(line.time) + " · leaves the road";
+  } else if (line.status === "failed") {
+    text = "LINE UNAVAILABLE";
+  }
+  $line.textContent = text;
+  $line.style.display = text ? "block" : "none";
+}
+
 // ---------- control hint ----------
 
 // Which control hint to show. Rather than sniffing the user agent (which gets
@@ -134,6 +150,8 @@ on("track-loaded", () => { refreshSeed(); syncClear(); });
 on("race-start", () => $overlay.classList.add("gone"));
 on("race-finish", showResult);
 on("input-mode", setInputMode);
+on("line-updated", refreshLine);
 
 setInputMode();
 syncClear();
+refreshLine();

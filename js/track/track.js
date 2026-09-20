@@ -41,21 +41,27 @@ function hashTrack(S) {
 }
 
 /**
- * Closest centreline segment to (px, py), searched within ±45 samples of `from`
- * (the car can't teleport, so a local search is enough and stays O(1)).
- * Returns { i: sample index, dist: perpendicular distance }.
+ * Closest centreline segment to (px, py), searched within ±window samples of
+ * `from` (the car can't teleport, so a local search is enough and stays O(1)).
+ * Returns { i: sample index, t: fraction along segment i, dist: perpendicular distance }.
+ *
+ * The game uses the default window so a car far off the road still tracks
+ * sensibly. For a car on the road the answer is identical for any window >= 2:
+ * the road half-width (132px) is inside the tightest corner radius (185px), so
+ * the nearest sample can only move by one per step there. The optimiser relies
+ * on that to use a narrow window.
  */
-export function nearest(px, py, from) {
+export function nearest(px, py, from, window = 45) {
   const S = track.samples, N = S.length;
-  let bi = from, bd = 1e18;
-  for (let k = -45; k <= 45; k++) {
+  let bi = from, bt = 0, bd = 1e18;
+  for (let k = -window; k <= window; k++) {
     const i = ((from + k) % N + N) % N;
     const a = S[i], b = S[(i + 1) % N];
     const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
     let t = ((px - a.x) * dx + (py - a.y) * dy) / L2; t = clamp(t, 0, 1);
     const qx = a.x + dx * t, qy = a.y + dy * t;
     const d = (px - qx) ** 2 + (py - qy) ** 2;
-    if (d < bd) { bd = d; bi = i; }
+    if (d < bd) { bd = d; bi = i; bt = t; }
   }
-  return { i: bi, dist: Math.sqrt(bd) };
+  return { i: bi, t: bt, dist: Math.sqrt(bd) };
 }

@@ -2,6 +2,7 @@
 
 import { $ } from "../core/dom.js";
 import { guides } from "../track/guides.js";
+import { ensureLine } from "../sim/line.js";
 import { camera } from "../render/camera.js";
 import { start } from "../game/race.js";
 import * as SFX from "../audio/sfx.js";
@@ -20,6 +21,7 @@ $guides.addEventListener("click", e => { e.stopPropagation(); setGuidesVisible(!
 export function setGuidesVisible(v) {
   guides.visible = v;
   $guides.textContent = "Guides: " + (v ? "on" : "off");
+  if (v) ensureLine();
 }
 
 const $mute = $("mute");

@@ -12,6 +12,7 @@ import { camera } from "../render/camera.js";
 import { loadTrack, start, tick } from "../game/race.js";
 import { setGuidesVisible } from "./controls.js";
 import { setSeedOverride } from "./hud.js";
+import { line, ensureLine } from "../sim/line.js";
 
 const cb = $("devGuides");
 const box = $("devSeed");
@@ -40,4 +41,4 @@ box.addEventListener("keydown", e => {
 box.addEventListener("keyup", e => e.stopPropagation());
 
 // Poke at live state from the browser console: window.neon.car, .race, .track…
-window.neon = { car, race, track, ghost, guides, camera, loadTrack, start, tick };
+window.neon = { car, race, track, ghost, guides, camera, line, loadTrack, start, tick, ensureLine };
