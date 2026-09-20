@@ -14,7 +14,13 @@ export function step(dt) {
   const speed = Math.hypot(car.vx, car.vy);   // entry speed, for the off-track cues
   const prevMult = car.mult;
 
-  const flags = integrate(car, steer(), dt);
+  // The run is fully described by the steps where the input changed; the
+  // leaderboard replays this list through the same integrate() to verify it.
+  const inp = steer();
+  if (inp !== race.lastInput) { race.inputs.push(race.steps, inp); race.lastInput = inp; }
+  race.steps++;
+
+  const flags = integrate(car, inp, dt);
 
   if (flags & BOOST_IGNITED) emit("boost");
 
