@@ -13,6 +13,8 @@ import { loadTrack, start, tick } from "../game/race.js";
 import { setGuidesVisible } from "./controls.js";
 import { setSeedOverride } from "./hud.js";
 import { line, ensureLine } from "../sim/line.js";
+import * as audio from "../audio/context.js";
+import * as music from "../audio/music.js";
 
 const cb = $("devGuides");
 const box = $("devSeed");
@@ -43,4 +45,4 @@ box.addEventListener("keydown", e => {
 box.addEventListener("keyup", e => e.stopPropagation());
 
 // Poke at live state from the browser console: window.neon.car, .race, .track…
-window.neon = { car, race, track, ghost, guides, camera, line, loadTrack, start, tick, ensureLine };
+window.neon = { car, race, track, ghost, guides, camera, line, audio, music, loadTrack, start, tick, ensureLine };

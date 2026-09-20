@@ -1,4 +1,4 @@
-// All sound, synthesized at runtime with Web Audio — no files. Continuous
+// Sound effects, synthesized at runtime with Web Audio — no files. Continuous
 // sounds are persistent nodes nudged via setTargetAtTime (never rebuilt per
 // frame, which crackles). One-shots are built on demand and self-destruct.
 //
@@ -8,6 +8,7 @@
 import { clamp } from "../core/math.js";
 import { on } from "../core/events.js";
 import * as storage from "../core/storage.js";
+import { whenReady } from "./context.js";
 
 const MUTE_KEY = "neondrift:mute";
 
@@ -17,12 +18,12 @@ let offF = null, offG = null, airF = null, airG = null, lfo = null, lfoG = null;
 let ready = false;
 let muted = storage.read(MUTE_KEY) === "1";
 
-function init() {
-  if (ctx) return;
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  ctx = new AC();
-  master = ctx.createGain(); master.gain.value = muted ? 0 : 0.9; master.connect(ctx.destination);
+// Build the persistent nodes as soon as the shared context exists. `master`
+// here is the effects bus: everything below joins it, and the mute switch is
+// its gain, so music is unaffected.
+whenReady((c, m) => {
+  ctx = c;
+  master = ctx.createGain(); master.gain.value = muted ? 0 : 1; master.connect(m);
 
   const len = Math.floor(ctx.sampleRate * 2);
   noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -65,7 +66,7 @@ function init() {
 
   noiseSrc.start();
   ready = true;
-}
+});
 
 function tone(freq, dur, vol, type, slideTo, delay) {
   if (!ready) return;
@@ -132,8 +133,19 @@ on("countdown", count);
 
 // ---------- public API ----------
 
-/** Must be called from inside a real tap/click handler, or iOS won't start audio. */
-export function unlock() { init(); if (ctx && ctx.state === "suspended") ctx.resume(); }
+// Context lifecycle (unlock, suspend) lives in context.js; re-exported so call
+// sites can keep treating this module as "the sound".
+export { unlock, suspend, resume } from "./context.js";
+
+export function isMuted() { return muted; }
+
+/** Flip the effects on or off, persist it, and return the new muted state. */
+export function toggleMute() {
+  muted = !muted;
+  storage.write(MUTE_KEY, muted ? "1" : "0");
+  if (master) master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05);
+  return muted;
+}
 
 /** Per-frame parameter update for the continuous sounds. Pass zeros when not racing. */
 export function update(drift, speed, off, boosting) {
@@ -149,20 +161,3 @@ export function update(drift, speed, off, boosting) {
   airG.gain.setTargetAtTime(boosting ? 0.083 : 0, t, 0.09);
   airF.frequency.setTargetAtTime(boosting ? 1400 : 700, t, 0.13);
 }
-
-export function isMuted() { return muted; }
-
-/** Flip mute, persist it, and return the new state. */
-export function toggleMute() {
-  muted = !muted;
-  storage.write(MUTE_KEY, muted ? "1" : "0");
-  if (master) master.gain.setTargetAtTime(muted ? 0 : 0.9, ctx.currentTime, 0.05);
-  return muted;
-}
-
-export function suspend() { if (ctx && ctx.state === "running") ctx.suspend(); }
-export function resume() { if (ctx && ctx.state === "suspended") ctx.resume(); }
-
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) suspend(); else resume();
-});

@@ -6,6 +6,7 @@ import { line, ensureLine } from "../sim/line.js";
 import { camera } from "../render/camera.js";
 import { start } from "../game/race.js";
 import * as SFX from "../audio/sfx.js";
+import * as Music from "../audio/music.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
@@ -27,12 +28,16 @@ export function setGuidesVisible(v) {
   if (v) ensureLine();
 }
 
-const $mute = $("mute");
-$mute.textContent = "Sound: " + (SFX.isMuted() ? "off" : "on");
-$mute.addEventListener("click", e => {
-  e.stopPropagation(); SFX.unlock();
-  $mute.textContent = "Sound: " + (SFX.toggleMute() ? "off" : "on");
-});
+// Effects and music each have a button in the HUD and one on the overlay
+// (title and end screens). All four read from the same two switches.
+const $fx = [$("mute"), $("overlaySfx")], $mu = [$("musictoggle"), $("overlayMusic")];
+function syncAudioButtons() {
+  for (const b of $fx) b.textContent = "Sound FX: " + (SFX.isMuted() ? "off" : "on");
+  for (const b of $mu) b.textContent = "Music: " + (Music.isEnabled() ? "on" : "off");
+}
+for (const b of $fx) b.addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); SFX.toggleMute(); syncAudioButtons(); });
+for (const b of $mu) b.addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); Music.toggle(); syncAudioButtons(); });
+syncAudioButtons();
 
 const $cam = $("camtoggle");
 $cam.addEventListener("click", e => {

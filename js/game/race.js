@@ -13,6 +13,7 @@ import { step } from "./physics.js";
 import { camera, resetCamera } from "../render/camera.js";
 import { draw } from "../render/renderer.js";
 import * as SFX from "../audio/sfx.js";
+import * as Music from "../audio/music.js";
 import { updateHud, updateCountdown } from "../ui/hud.js";
 
 let last = performance.now();
@@ -82,6 +83,7 @@ export function tick(now) {
   const live = race.running && race.countdown <= 0;
   if (live) SFX.update(car.drift, Math.hypot(car.vx, car.vy), car.off, car.boosting);
   else SFX.update(0, 0, false, false);
+  Music.update(live, live && car.boosting);
 
   draw(dt, live ? clamp(acc / PHYSICS_DT, 0, 1) : 1);
   updateHud();

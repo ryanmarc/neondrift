@@ -23,6 +23,11 @@ single-file original).
 Serve it rather than opening the file from disk — `localStorage` (used for ghosts
 and best times) behaves inconsistently under `file://` in some browsers.
 
+**After editing a module, hard-reload (Cmd+Shift+R).** `http.server` sends no
+`Cache-Control`, so Chrome keeps module scripts for a while under its heuristic
+freshness rule and a plain reload can run stale code. "The change didn't take"
+has meant exactly this twice.
+
 ## URL params
 
 - `?seed=2026-12-25` — force a specific track. Any string works; it is only ever
@@ -119,7 +124,9 @@ js/sim/     schedule.js input schedules keyed on track progress; createInput, no
 js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
-js/audio/   sfx.js      unlock, update, isMuted, toggleMute; subscribes to game events
+js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
+            sfx.js      effects: update(); subscribes to game events; re-exports the context API
+            music.js    synthesized synthwave loop; update(live, boosting) picks the mix
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
             controls.js buttons and the R key
             devpanel.js dev panel; also puts `window.neon` up for console poking
@@ -171,9 +178,23 @@ Conventions:
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
   updated via `setTargetAtTime`. Per-frame node creation causes crackling.
+- **Music never restarts; the race changes its mix.** `audio/music.js` keeps
+  one sequencer running from the first tap and ramps gains and a lowpass
+  between menu / race / boost states. Notes are scheduled 1.5s ahead on the
+  audio clock from a 250ms timer — far enough that a background tab's 1Hz
+  timer throttling can't starve it; nodes are made per note, not per frame. Kick
+  and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
+- **Title-screen music is best-effort.** `armAutoplay()` creates the context at
+  boot and resumes it on the first click, tap or key anywhere. Browsers refuse
+  to start audio before any interaction, so a fresh visitor's title screen is
+  silent until they touch something; returning visitors usually get it at once.
+- **Effects and music are separate switches** on separate buses under one
+  master: `neondrift:mute` is the effects bus, `neondrift:music` the music bus.
+  Every audio button (HUD and overlay) goes through `syncAudioButtons()`.
 - **Audio must unlock inside a real tap handler.** iOS refuses to start an
   `AudioContext` otherwise, and deferring it even one frame fails. `SFX.unlock()`
-  is called from the play, restart and mute click handlers.
+  (really `audio/context.js`) is called from the play, restart, mute and music
+  click handlers; both the effects and the music build their nodes on it.
 - **Feed the audio silence when not racing.** `step()` stops at the finish, so
   `car.drift` and velocity freeze at their last values. Passing those stale
   numbers to `SFX.update()` leaves the skid playing forever. `draw()`'s caller
@@ -295,7 +316,8 @@ keyboard tablets wrong.
 - `neondrift:t<trackId>:best` — best time for that track geometry
 - `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
 - `neondrift:t<trackId>:line:v<n>-<hash>` — optimal line markers for that geometry + physics
-- `neondrift:mute` — sound preference, global
+- `neondrift:mute` — sound effects on/off, global
+- `neondrift:music` — music on/off, global
 
 Wrap every read in try/catch and render correctly when storage is empty.
 
@@ -352,4 +374,5 @@ else references them.
   key. Note the seed uses *local* midnight — switch to UTC for a real leaderboard.
 - **Engine sound.** Deliberately skipped; it's more work than everything else in
   the audio module combined. Detuned sawtooths with a speed-driven lowpass.
+  (Music now exists — see `audio/music.js` — but engine noise still doesn't.)
 - **Track selection / multiple tracks.** `loadTrack(seed)` already supports it.
