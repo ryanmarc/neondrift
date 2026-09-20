@@ -1,7 +1,7 @@
-// Background music, synthesized at runtime — no files. A four-bar synthwave
-// loop (A minor: Am F C G) sequenced on the audio clock: a timer wakes every
-// 80ms and schedules every note that falls in the next 200ms, which is the
-// standard way to keep Web Audio timing tight while the main thread jitters.
+// Background music, synthesized at runtime — no files. A sixteen-bar synthwave
+// loop in A minor (see SONG below) sequenced on the audio clock: a timer wakes
+// every 250ms and schedules every note that falls in the next 1.5s, which is
+// the standard way to keep Web Audio timing tight while the main thread jitters.
 // Nodes are created per NOTE (a couple of dozen a second), never per frame.
 //
 // The loop never stops or restarts; the race only changes the MIX. Three
@@ -20,32 +20,59 @@ const KEY = "neondrift:music";
 const BPM = 118;
 const STEP = 60 / BPM / 4;          // one sixteenth, seconds
 const STEPS_PER_BAR = 16;
-const BARS = 4;
-const LOOKAHEAD = 0.2, TICK_MS = 80;
+// Schedule well ahead: browsers throttle timers in background tabs to once a
+// second, and a lookahead longer than that keeps the loop continuous anyway.
+// Nothing is lost by it — the mix is gains and a filter, not per-note choices.
+const LOOKAHEAD = 1.5, TICK_MS = 250;
 
 // ---------- the tune ----------
-// MIDI note numbers; 69 = A4 = 440Hz. One chord per bar.
-const ARP = [                       // eight-note figures, played twice per bar
-  [69, 72, 76, 81, 84, 81, 76, 72], // Am
-  [65, 69, 72, 77, 81, 77, 72, 69], // F
-  [67, 72, 76, 79, 84, 79, 76, 72], // C
-  [67, 71, 74, 79, 83, 79, 74, 71], // G
+// MIDI note numbers; 69 = A4 = 440Hz. Sixteen bars in four phrases:
+//   1  Am F C G   plain
+//   2  Am F C G   wider arpeggio, bass jumps the octave, fill into phrase 3
+//   3  Dm F Am E  the turn — E major against the minor key gives the tension
+//   4  F G Am G   lead melody on top, big fill, then round again
+// Bass and pad roots stay above the ~140Hz phone-speaker floor.
+const CHORDS = {
+  Am: [57, 60, 64], F: [53, 57, 60], C: [60, 64, 67], G: [55, 59, 62],
+  Dm: [50, 53, 57], E: [52, 56, 59],
+};
+// Arpeggio figures index into the chord's six-note stack (triad + triad an
+// octave up) and are played twice per bar.
+const FIGURES = [
+  [0, 1, 2, 3, 4, 3, 2, 1],   // up and down
+  [0, 2, 4, 5, 4, 2, 3, 1],   // wider, brighter
+  [5, 4, 3, 2, 1, 0, 1, 2],   // falling
 ];
-const PAD = [[57, 60, 64], [53, 57, 60], [60, 64, 67], [55, 59, 62]];   // A3 C4 E4 …
-const BASS = [57, 53, 60, 55];      // A3 F3 C4 G3 — all above the ~140Hz phone-speaker floor
+// Lead melody for phrase 4, one slot per sixteenth (0 = rest).
+const LEAD = [
+  [76, 0, 0, 0, 79, 0, 0, 0, 81, 0, 0, 0, 79, 0, 76, 0],
+  [79, 0, 0, 0, 76, 0, 0, 0, 74, 0, 0, 0, 76, 0, 0, 0],
+  [72, 0, 0, 0, 76, 0, 0, 0, 81, 0, 0, 0, 84, 0, 81, 0],
+  [79, 0, 0, 0, 76, 0, 74, 0, 72, 0, 0, 0, 0, 0, 0, 0],
+];
+// One entry per bar: chord, arpeggio figure, bass style (0 roots, 1 octave
+// jumps), open hats on the off-beats, snare fill in the last beat, lead line.
+const bar = (chord, fig, bass, open, fill, lead) => ({ chord, fig, bass, open, fill, lead });
+const SONG = [
+  bar("Am", 0, 0, 0, 0, null), bar("F", 0, 0, 0, 0, null), bar("C", 0, 0, 0, 0, null), bar("G", 0, 0, 0, 0, null),
+  bar("Am", 1, 1, 1, 0, null), bar("F", 1, 1, 1, 0, null), bar("C", 1, 1, 1, 0, null), bar("G", 1, 1, 1, 1, null),
+  bar("Dm", 2, 0, 0, 0, null), bar("F", 2, 0, 0, 0, null), bar("Am", 0, 0, 0, 0, null), bar("E", 2, 0, 0, 1, null),
+  bar("F", 1, 1, 1, 0, LEAD[0]), bar("G", 1, 1, 1, 0, LEAD[1]), bar("Am", 1, 1, 1, 0, LEAD[2]), bar("G", 1, 1, 1, 1, LEAD[3]),
+];
 const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+const BARS = SONG.length;
 
 // ---------- mix states ----------
 const MIX = {
-  menu:  { bus: 0.55, filter: 700,  arp: 0.55, pad: 1.0, bass: 0,   drums: 0 },
-  race:  { bus: 1.0,  filter: 2600, arp: 1.0,  pad: 0.8, bass: 1.0, drums: 1.0 },
-  boost: { bus: 1.0,  filter: 5200, arp: 1.3,  pad: 0.8, bass: 1.0, drums: 1.0 },
+  menu:  { bus: 0.55, filter: 700,  arp: 0.55, pad: 1.0, bass: 0,   drums: 0,   lead: 0.5 },
+  race:  { bus: 1.0,  filter: 2600, arp: 1.0,  pad: 0.8, bass: 1.0, drums: 1.0, lead: 1.0 },
+  boost: { bus: 1.0,  filter: 5200, arp: 1.3,  pad: 0.8, bass: 1.0, drums: 1.0, lead: 1.2 },
 };
 const BUS_GAIN = 0.35;              // the whole music under the effects (0.42 was too loud, 0.28 too quiet)
 
 let ctx = null;
 let bus = null, tone = null, filter = null;               // bus ← filter ← tone layers; drums → bus
-let arpG = null, padG = null, bassG = null, drumG = null;
+let arpG = null, padG = null, bassG = null, drumG = null, leadG = null;
 let noiseBuf = null;
 let enabled = storage.read(KEY) !== "0";                  // on by default
 let state = "menu";
@@ -61,6 +88,7 @@ whenReady((c, master) => {
   arpG = ctx.createGain(); arpG.connect(tone);
   padG = ctx.createGain(); padG.connect(tone);
   bassG = ctx.createGain(); bassG.connect(tone);
+  leadG = ctx.createGain(); leadG.connect(tone);
   drumG = ctx.createGain(); drumG.connect(bus);
 
   const len = Math.floor(ctx.sampleRate * 1);
@@ -110,27 +138,37 @@ function kick(t0) {
 }
 
 function playStep(i, t) {
-  const bar = Math.floor(i / STEPS_PER_BAR) % BARS, s = i % STEPS_PER_BAR;
+  const b = SONG[Math.floor(i / STEPS_PER_BAR) % BARS], s = i % STEPS_PER_BAR;
+  const tones = CHORDS[b.chord];
+  const stack = [tones[0], tones[1], tones[2], tones[0] + 12, tones[1] + 12, tones[2] + 12];
 
-  // arpeggio: sixteenths, short and plucky
-  osc("sawtooth", hz(ARP[bar][s % 8]), t, t + STEP * 0.9, arpG, 0.06, 0.006, 0.05);
+  // arpeggio: sixteenths, short and plucky, an octave above the pad
+  osc("sawtooth", hz(stack[FIGURES[b.fig][s % 8]] + 12), t, t + STEP * 0.9, arpG, 0.06, 0.006, 0.05);
 
-  // bass: eighths on the root
-  if (s % 2 === 0) osc("sawtooth", hz(BASS[bar]), t, t + STEP * 1.7, bassG, 0.11, 0.008, 0.06);
+  // bass: eighths on the root; style 1 jumps the octave on the off-beats
+  if (s % 2 === 0) {
+    const up = b.bass === 1 && s % 4 === 2;
+    osc("sawtooth", hz(tones[0] + (up ? 12 : 0)), t, t + STEP * (up ? 1.2 : 1.7), bassG, up ? 0.08 : 0.11, 0.008, 0.06);
+  }
 
   // pad: one chord per bar, two detuned saws per note, slow in and out
   if (s === 0) {
     const t1 = t + STEP * STEPS_PER_BAR;
-    for (const n of PAD[bar]) {
+    for (const n of tones) {
       osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, -7);
       osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, +7);
     }
   }
 
+  // lead: a square with a soft edge, only where the song table says so
+  if (b.lead && b.lead[s]) osc("square", hz(b.lead[s]), t, t + STEP * 1.8, leadG, 0.03, 0.01, 0.12);
+
   // drums: four-on-the-floor kick, snare on 2 and 4, hats on every sixteenth
   if (s % 4 === 0) kick(t);
   if (s === 4 || s === 12) noise(t, 0.14, drumG, 0.14, "bandpass", 1800, 0.8);
-  noise(t, s % 4 === 2 ? 0.06 : 0.03, drumG, s % 4 === 2 ? 0.05 : 0.025, "highpass", 7000);
+  if (b.fill && s >= 12) noise(t, 0.10, drumG, 0.05 + 0.03 * (s - 12), "bandpass", 1800, 0.8);   // rising snare roll
+  const openHat = b.open && s % 4 === 2;
+  noise(t, openHat ? 0.12 : s % 4 === 2 ? 0.06 : 0.03, drumG, openHat ? 0.05 : s % 4 === 2 ? 0.045 : 0.025, "highpass", 7000);
 }
 
 // ---------- sequencer ----------
@@ -163,7 +201,7 @@ function applyMix(tau) {
   const set = (p, v) => tau > 0 ? p.setTargetAtTime(v, t, tau) : p.setValueAtTime(v, t);
   set(bus.gain, enabled ? BUS_GAIN * m.bus : 0);
   set(filter.frequency, m.filter);
-  set(arpG.gain, m.arp); set(padG.gain, m.pad); set(bassG.gain, m.bass); set(drumG.gain, m.drums);
+  set(arpG.gain, m.arp); set(padG.gain, m.pad); set(bassG.gain, m.bass); set(drumG.gain, m.drums); set(leadG.gain, m.lead);
 }
 
 // ---------- public API ----------

@@ -25,6 +25,9 @@ export function unlock() {
     master = ctx.createGain(); master.gain.value = MASTER_GAIN; master.connect(ctx.destination);
     for (const fn of pending) fn(ctx, master);
     pending.length = 0;
+    // Created in a background tab (no visibilitychange will have fired): stay
+    // silent until the tab is looked at, like the handler below would do.
+    if (document.hidden) { ctx.suspend(); return; }
   }
   if (ctx.state === "suspended") ctx.resume();
 }

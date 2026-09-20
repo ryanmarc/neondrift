@@ -180,8 +180,9 @@ Conventions:
   updated via `setTargetAtTime`. Per-frame node creation causes crackling.
 - **Music never restarts; the race changes its mix.** `audio/music.js` keeps
   one sequencer running from the first tap and ramps gains and a lowpass
-  between menu / race / boost states. Notes are scheduled ~200ms ahead on the
-  audio clock from an 80ms timer; nodes are made per note, not per frame. Kick
+  between menu / race / boost states. Notes are scheduled 1.5s ahead on the
+  audio clock from a 250ms timer — far enough that a background tab's 1Hz
+  timer throttling can't starve it; nodes are made per note, not per frame. Kick
   and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
 - **Title-screen music is best-effort.** `armAutoplay()` creates the context at
   boot and resumes it on the first click, tap or key anywhere. Browsers refuse
