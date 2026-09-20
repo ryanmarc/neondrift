@@ -43,5 +43,8 @@ export const GUIDES_FLAG = false || QS.has("guides");
 // screen. Hidden by default; flip to true here or append ?dev to the URL.
 export const DEV_FLAG = false || QS.has("dev");
 
-// Leaderboard API. Empty string disables the leaderboard entirely.
-export const API_URL = "https://neondrift-api.rolux.workers.dev";
+// Leaderboard API. Served from localhost the game talks to the local worker
+// (`cd worker && npm run dev`), which has its own simulated database; anywhere
+// else it uses the deployed one. Empty string disables the leaderboard entirely.
+const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+export const API_URL = LOCAL ? "http://localhost:8787" : "https://neondrift-api.rolux.workers.dev";

@@ -380,9 +380,10 @@ its recorded inputs; the replayed time is what gets stored. Routes are in
 in `wrangler.toml`: the GitHub Pages origin in production, localhost only
 under `wrangler dev --env dev`. Writes are rate limited per IP.
 
-Run it locally: `cd worker && npm install && npm run db:init:local && npm run dev`,
-then set `API_URL` in `config/params.js` to `http://localhost:8787` (and set it
-back to `""` before committing — empty means the leaderboard is off).
+Run it locally: `cd worker && npm install && npm run db:init:local && npm run dev`.
+A game served from localhost talks to it automatically (`API_URL` in
+`config/params.js` picks the local worker by hostname); the local worker uses
+a simulated D1 under `worker/.wrangler/`, never production.
 `node test/make-run.mjs <seed>` writes a genuine run to `/tmp/run.json` for
 `curl` tests.
 
