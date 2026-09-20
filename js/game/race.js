@@ -46,7 +46,7 @@ export function start() {
 
 function finish() {
   race.running = false; race.finished = true;
-  emit("race-finish", commitRun(race.time, race.rec));
+  emit("race-finish", commitRun(race.time, race.rec, race.inputs));
 }
 
 /**

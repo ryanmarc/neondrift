@@ -49,6 +49,10 @@ up how fast the meter fills; touching the edge of the road resets it.
 - **Ghost.** Your best run on each track is recorded and replays as a ghost,
   with a live delta that compares you at the same point on the track rather
   than the same moment in time.
+- **Leaderboard.** Top times per track, verified: the game records when you
+  pressed and released, and the server replays that through the same physics
+  before it believes the time. Your identity is a secret in your browser;
+  "Play on another device" moves it with a six-letter code.
 - **Adaptive music.** A synthesized synthwave loop that plays quietly on the
   menu, opens up when the race starts, and lifts while you boost. Effects and
   music have separate toggles.
@@ -104,8 +108,15 @@ js/render/   camera.js    chase camera
 js/audio/    context.js   the one AudioContext, unlock, hidden-tab suspend
              sfx.js       synthesized effects
              music.js     synthesized music and its race-aware mix
+js/net/      identity.js  the player's secret and name
+             api.js       fetch wrappers for the leaderboard API
+             leaderboard.js board state, submitting personal bests, pairing
 js/ui/       hud.js       readouts, control hint, end screen
              controls.js  buttons and shortcuts
+             board.js     the leaderboard panel
+worker/                   the leaderboard API: a Cloudflare Worker with D1 that
+                          verifies runs by replaying them through js/game/dynamics.js
+test/                     Node tests (node --test "test/*.test.mjs")
 ```
 
 ## Architecture
@@ -138,6 +149,7 @@ synthetic timestamps from a console or a test.
 | `countdown` | 3, 2, 1, then 0 for GO |
 | `race-start`, `race-finish` | run began / ended (finish carries time, previous best, PB flag) |
 | `track-loaded` | a new track is in place |
+| `board-updated` | leaderboard state changed |
 | `input-mode` | the player used pointer or keys |
 
 ### Invariants
@@ -266,6 +278,9 @@ means nothing saved.
 |---|---|
 | `neondrift:t<id>:best` | best time for that track geometry |
 | `neondrift:t<id>:ghost` | ghost recording for that geometry |
+| `neondrift:t<id>:inputs` | the best run's input changes, what the leaderboard verifies |
+| `neondrift:player` | the leaderboard secret; the server only sees its hash |
+| `neondrift:name` | the display name |
 | `neondrift:mute` | sound effects on/off |
 | `neondrift:music` | music on/off |
 

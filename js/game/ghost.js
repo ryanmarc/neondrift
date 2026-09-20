@@ -9,39 +9,45 @@ import { GHOST_HZ } from "../config/tuning.js";
 export const ghost = {
   data: null,       // flat [x, y, angle, progress, ...] or null
   bestTime: null,   // seconds, or null if no run saved for this track
+  inputs: null,     // the saved best run's input changes, or null
 };
 
-let keyBest = "", keyGhost = "";
+let keyBest = "", keyGhost = "", keyInputs = "";
 
 /** Load whatever is saved for this track id (or nothing). */
 export function loadGhost(trackId) {
   keyBest = "neondrift:t" + trackId + ":best";
   keyGhost = "neondrift:t" + trackId + ":ghost";
-  ghost.data = null; ghost.bestTime = null;
+  keyInputs = "neondrift:t" + trackId + ":inputs";
+  ghost.data = null; ghost.bestTime = null; ghost.inputs = null;
   const b = storage.read(keyBest); if (b) ghost.bestTime = parseFloat(b);
   const g = storage.read(keyGhost); if (g) { try { ghost.data = JSON.parse(g); } catch { /* corrupt: ignore */ } }
+  const i = storage.read(keyInputs); if (i) { try { ghost.inputs = JSON.parse(i); } catch { /* corrupt: ignore */ } }
 }
 
 /** Forget the saved run for this track. */
 export function clearGhost() {
-  ghost.data = null; ghost.bestTime = null;
-  storage.remove(keyBest); storage.remove(keyGhost);
+  ghost.data = null; ghost.bestTime = null; ghost.inputs = null;
+  storage.remove(keyBest); storage.remove(keyGhost); storage.remove(keyInputs);
 }
 
 /**
  * Called at the finish line. Saves the run if it's a personal best and returns
- * what the end screen needs. prevBest is captured before it is overwritten.
+ * what the end screen and the leaderboard need. prevBest is captured before it
+ * is overwritten.
  */
-export function commitRun(time, rec) {
+export function commitRun(time, rec, inputs) {
   const prevBest = ghost.bestTime;
   const isPB = prevBest == null || time < prevBest;
   if (isPB) {
     ghost.bestTime = time;
     ghost.data = rec;
+    ghost.inputs = inputs;
     storage.write(keyBest, String(time));
     storage.write(keyGhost, JSON.stringify(rec));
+    storage.write(keyInputs, JSON.stringify(inputs));
   }
-  return { time, prevBest, isPB };
+  return { time, prevBest, isPB, ghost: rec, inputs };
 }
 
 /** Ghost pose at race time t, interpolated between recorded frames. */

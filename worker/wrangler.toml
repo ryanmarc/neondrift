@@ -1,0 +1,23 @@
+name = "neondrift-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://ryanmarc.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "neondrift"
+database_id = "95cd3136-5fd2-4b58-98fd-e2c57d2b7e2e"
+
+[[unsafe.bindings]]
+name = "POST_LIMIT"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }
+
+[[unsafe.bindings]]
+name = "CLAIM_LIMIT"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 5, period = 60 }

@@ -118,7 +118,11 @@ js/render/  camera.js   `camera`, resetCamera, updateCamera
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
             sfx.js      effects: update(); subscribes to game events; re-exports the context API
             music.js    synthesized synthwave loop; update(live, boosting) picks the mix
+js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
+            api.js      fetch wrappers for the leaderboard API; every failure resolves to null
+            leaderboard.js `board` state; submits personal bests; rename; pairing; emits board-updated
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
+            board.js    the leaderboard panel: top 10, own row, name prompt, pairing links
             controls.js buttons and the R key
             devpanel.js dev panel; also puts `window.neon` up for console poking
 ```
@@ -176,6 +180,10 @@ Conventions:
   audio clock from a 250ms timer — far enough that a background tab's 1Hz
   timer throttling can't starve it; nodes are made per note, not per frame. Kick
   and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
+- **Times are verified by replay, never trusted.** The physics wrapper records
+  the step at which the input changed; the worker replays that through the
+  same `integrate()`. Anything that changes `dynamics.js` changes what replays
+  to, so old stored inputs will no longer verify — that is expected.
 - **Title-screen music is best-effort.** `armAutoplay()` creates the context at
   boot and resumes it on the first click, tap or key anywhere. Browsers refuse
   to start audio before any interaction, so a fresh visitor's title screen is
@@ -308,6 +316,9 @@ keyboard tablets wrong.
 - `neondrift:t<trackId>:best` — best time for that track geometry
 - `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
 - `neondrift:t<trackId>:line:v<n>-<hash>` — optimal line markers for that geometry + physics
+- `neondrift:t<trackId>:inputs` — the best run's input changes (what the leaderboard replays)
+- `neondrift:player` — the leaderboard secret; `sha256` of it is the player id
+- `neondrift:name` — the display name
 - `neondrift:mute` — sound effects on/off, global
 - `neondrift:music` — music on/off, global
 
@@ -359,10 +370,36 @@ It is the `DEV PANEL START/END` block in `index.html`, the
 its import line in `js/main.js`. Deleting them is clean — nothing else
 references them.
 
+## Leaderboard worker (`worker/`)
+
+A Cloudflare Worker with D1. It imports the game's `dynamics.js`, `track.js`
+and `tuning.js` by relative path and verifies every submitted run by replaying
+its recorded inputs; the replayed time is what gets stored. Routes are in
+`worker/src/index.js`: `POST /runs`, `GET /board`, `POST /name`,
+`POST /pair/start`, `POST /pair/claim`. CORS is limited to `ALLOWED_ORIGINS`
+in `wrangler.toml` plus localhost; writes are rate limited per IP.
+
+Run it locally: `cd worker && npm install && npm run db:init:local && npm run dev`,
+then set `API_URL` in `config/params.js` to `http://localhost:8787` (and set it
+back to `""` before committing — empty means the leaderboard is off).
+`node test/make-run.mjs <seed>` writes a genuine run to `/tmp/run.json` for
+`curl` tests.
+
+Deploying: `wrangler d1 create neondrift` once and paste the id into
+`wrangler.toml`; `npm run db:init`; then connect the repo in the Cloudflare
+dashboard (Workers & Pages → Create → Connect GitHub) with the root directory
+set to `worker/`. Set `API_URL` to the worker's URL.
+
+Tests: `node --test "test/*.test.mjs"` covers the input recording, the replay (a genuine
+run replays to the identical time; tampering, wrong claims and unfinished runs
+are rejected), validation, and the client identity.
+
 ## Not built yet
 
-- **Daily leaderboard.** Needs shared storage. The geometry hash is the natural
-  key; the daily seed is already UTC.
+- **Optimal ghost.** The line worker already has the full trace; playing it
+  back as a second ghost is the natural next step.
+- **Turnstile.** If the leaderboard gets abused from scripts, Cloudflare
+  Turnstile (invisible mode) bound to the Pages hostname is the free fix.
 - **Engine sound.** Deliberately skipped; it's more work than everything else in
   the audio module combined. Detuned sawtooths with a speed-driven lowpass.
   (Music now exists — see `audio/music.js` — but engine noise still doesn't.)

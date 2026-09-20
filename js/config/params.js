@@ -42,3 +42,6 @@ export const GUIDES_FLAG = false || QS.has("guides");
 // FEATURE FLAG: the dev panel (seed loader, guides checkbox) on the start
 // screen. Hidden by default; flip to true here or append ?dev to the URL.
 export const DEV_FLAG = false || QS.has("dev");
+
+// Leaderboard API. Empty string disables the leaderboard entirely.
+export const API_URL = "https://neondrift-api.rolux.workers.dev";

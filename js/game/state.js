@@ -18,6 +18,9 @@ export const race = {
   trailAcc: 0,
   rec: [],          // ghost recording: flat [x, y, angle, progress, ...]
   recAcc: 0,
+  inputs: [],       // [step, input, step, input, …] — every step the steering changed
+  steps: 0,         // physics steps since GO; time = steps * PHYSICS_DT
+  lastInput: 0,     // what was recorded last, so a change can be detected
   chainFlash: 0,
   shake: 0,
   breakT: 0,        // "×N LOST" readout timer
@@ -29,6 +32,7 @@ export function resetRace(startSample) {
   placeCar(car, startSample);
   race.time = 0; race.finished = false;
   race.marks = []; race.rec = []; race.recAcc = 0;
+  race.inputs = []; race.steps = 0; race.lastInput = 0;
   race.chainFlash = 0; race.shake = 0; race.breakT = 0; race.lostMult = 1;
   race.trail = []; race.trailAcc = 0;
 }
