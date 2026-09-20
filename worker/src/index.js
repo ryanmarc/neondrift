@@ -24,10 +24,12 @@ function randomCode() {
   return [...bytes].map(b => v.CODE_ALPHABET[b % v.CODE_ALPHABET.length]).join("");
 }
 
+// Only origins listed in ALLOWED_ORIGINS get CORS headers. Production lists the
+// GitHub Pages site; `wrangler dev --env dev` swaps in localhost (see wrangler.toml).
 function corsHeaders(request, env) {
   const origin = request.headers.get("origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-  const ok = allowed.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
+  const ok = allowed.includes(origin);
   return ok ? {
     "access-control-allow-origin": origin,
     "access-control-allow-methods": "GET, POST, OPTIONS",

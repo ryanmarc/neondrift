@@ -5,6 +5,12 @@ compatibility_date = "2026-09-01"
 [vars]
 ALLOWED_ORIGINS = "https://ryanmarc.github.io"
 
+# Local development: `npm run dev` runs `wrangler dev --env dev`, which allows
+# the game served from localhost. A plain `wrangler deploy` never includes it.
+[env.dev]
+vars = { ALLOWED_ORIGINS = "http://localhost:8000,http://127.0.0.1:8000" }
+d1_databases = [{ binding = "DB", database_name = "neondrift", database_id = "95cd3136-5fd2-4b58-98fd-e2c57d2b7e2e" }]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "neondrift"
