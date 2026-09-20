@@ -6,7 +6,7 @@ import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
 import { clamp } from "../core/math.js";
 import { LAPS, T_TICK, T_GO } from "../config/tuning.js";
-import { SEED_OVERRIDE } from "../config/params.js";
+import { SEED_OVERRIDE, todayUtc, describeUntilRollover } from "../config/params.js";
 import { track } from "../track/track.js";
 import { car, race } from "../game/state.js";
 import { ghost, ghostTimeAtProgress, clearGhost } from "../game/ghost.js";
@@ -16,7 +16,7 @@ const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best
 const $fill = $("fill"), $chain = $("chain"), $meter = $("meter");
 const $countdown = $("countdown");
 const $overlay = $("overlay"), $result = $("result"), $go = $("go"), $seed = $("seed");
-const $rule = $("rule"), $clear = $("clearghost"), $line = $("line");
+const $rule = $("rule"), $clear = $("clearghost"), $line = $("line"), $next = $("next");
 
 export const fmt = t => t.toFixed(2);
 
@@ -104,6 +104,15 @@ function refreshLine() {
   $go.disabled = line.status === "computing";   // no racing until the line is ready
 }
 
+// ---------- daily rollover countdown ----------
+
+function refreshNext() {
+  const show = track.seed === todayUtc();   // only the daily track changes on a schedule
+  $next.textContent = show ? "Track will change in " + describeUntilRollover() + "." : "";
+  $next.style.display = show ? "block" : "none";
+}
+setInterval(refreshNext, 15000);
+
 // ---------- control hint ----------
 
 // Which control hint to show. Rather than sniffing the user agent (which gets
@@ -147,7 +156,7 @@ function showResult({ time, prevBest, isPB }) {
 
 // ---------- wiring ----------
 
-on("track-loaded", () => { refreshSeed(); syncClear(); });
+on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); });
 on("race-start", () => $overlay.classList.add("gone"));
 on("race-finish", showResult);
 on("input-mode", setInputMode);
@@ -156,3 +165,4 @@ on("line-updated", refreshLine);
 setInputMode();
 syncClear();
 refreshLine();
+refreshNext();

@@ -22,8 +22,8 @@ has meant exactly this twice.
 
 ## URL params
 
-- `?seed=2026-12-25` — force a specific track. Any string works; it is only ever
-  hashed into the PRNG seed.
+- `?seed=2026-12-25` — force a specific track (the daily seed is the UTC date).
+  Any string works; it is only ever hashed into the PRNG seed.
 - `?seed=random` — a new track every load.
 - `?dev` — show the dev panel (seed loader, guides checkbox) on the start
   screen. Hidden by default; `DEV_FLAG` in `config/params.js`.
@@ -101,6 +101,7 @@ js/track/   generator.js  trackFromAmps, buildTrack(rng) — pure
             track.js      `track` {seed, id, samples}, loadTrackGeometry, nearest
             guides.js     `guides` {flag, visible, list}, rebuildGuides
 js/game/    state.js    `car`, `race`, resetRace
+            daily.js    UTC daily seed, time to rollover, and the rollover itself
             dynamics.js integrate(car, inp, dt) — the pure car model; createCar, placeCar
             ghost.js    `ghost` {data, bestTime}, loadGhost, commitRun, clearGhost, ghostAt…
             physics.js  step(dt) — integrate() on the live car + marks, plume, recording, events
@@ -361,7 +362,7 @@ references them.
 ## Not built yet
 
 - **Daily leaderboard.** Needs shared storage. The geometry hash is the natural
-  key. Note the seed uses *local* midnight — switch to UTC for a real leaderboard.
+  key; the daily seed is already UTC.
 - **Engine sound.** Deliberately skipped; it's more work than everything else in
   the audio module combined. Detuned sawtooths with a speed-driven lowpass.
   (Music now exists — see `audio/music.js` — but engine noise still doesn't.)

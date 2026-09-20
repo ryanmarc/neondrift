@@ -94,6 +94,7 @@ canvas{display:block;width:100%;height:100%}
 }
 #seed{font-size:11px;letter-spacing:.3em;opacity:.45;margin-top:14px}
 #seed .override{color:var(--rose);opacity:.9;letter-spacing:.16em}
+#next{display:none;font-size:12px;letter-spacing:.04em;margin-top:10px;opacity:.5;font-variant-numeric:tabular-nums}
 #line{display:none;font-size:11px;letter-spacing:.2em;margin-top:8px;color:#49ff9e;opacity:.75;font-variant-numeric:tabular-nums}
 #howto{display:flex;flex-direction:column;align-items:center;gap:9px;max-width:37ch;margin:0}
 #rule{

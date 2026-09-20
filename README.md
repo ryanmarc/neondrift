@@ -37,13 +37,15 @@ up how fast the meter fills; touching the edge of the road resets it.
 
 | Parameter | Effect |
 |---|---|
-| `?seed=2026-12-25` | Play that day's track. Any string works as a seed. |
+| `?seed=2026-12-25` | Play that day's track (dates are UTC). Any string works as a seed. |
 | `?seed=random` | A fresh track every load. |
 
 ## Features
 
-- **A new track every day.** Tracks are generated from the date, so everyone
-  gets the same layout on the same day.
+- **A new track every day.** Tracks are generated from the UTC date, so everyone
+  gets the same layout on the same day, and the title screen says how long
+  until it changes. If you leave the page open past midnight UTC, the new
+  track loads itself between races.
 - **Ghost.** Your best run on each track is recorded and replays as a ghost,
   with a live delta that compares you at the same point on the track rather
   than the same moment in time.
@@ -90,7 +92,8 @@ js/config/   params.js    URL params, today's date, initial seed
              tuning.js    every tuning constant
 js/track/    generator.js sine-harmonic track generator (pure)
              track.js     the current track: samples, geometry id, nearest()
-js/game/     dynamics.js  the pure car model: integrate(car, input, dt)
+js/game/     daily.js     UTC daily seed, time to rollover, and the rollover itself
+             dynamics.js  the pure car model: integrate(car, input, dt)
              physics.js   the live car's step: dynamics plus marks, plume, recording, events
              state.js     car and race state
              ghost.js     best run per track

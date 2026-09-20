@@ -3,7 +3,7 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { TODAY, DEV_FLAG } from "../config/params.js";
+import { todayUtc, DEV_FLAG } from "../config/params.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { car, race } from "../game/state.js";
@@ -27,7 +27,7 @@ cb.addEventListener("change", () => setGuidesVisible(cb.checked));
 
 function apply(seed) {
   if (!seed) return;
-  setSeedOverride(seed !== TODAY);
+  setSeedOverride(seed !== todayUtc());
   loadTrack(seed);
   $result.innerHTML = '<span class="note">Loaded track from seed "' + seed + '".</span>';
   $go.textContent = "TAP TO RACE";
