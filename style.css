@@ -78,14 +78,26 @@ canvas{display:block;width:100%;height:100%}
 #musictoggle{top:calc(env(safe-area-inset-top,0px) + 210px);right:16px}
 #guidetoggle{top:calc(env(safe-area-inset-top,0px) + 256px);right:16px}
 
+/* The overlay scrolls: the sheet centres itself when it fits and scrolls when
+   it doesn't (margin:auto on a flex child does both). Body has touch-action:none
+   for the race, so the overlay re-enables vertical panning for itself. */
 #overlay{
   position:absolute;inset:0;z-index:20;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:20px;padding:24px;text-align:center;
+  display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+  padding:calc(env(safe-area-inset-top,0px) + 20px) 16px calc(env(safe-area-inset-bottom,0px) + 20px);
+  text-align:center;
   background:radial-gradient(ellipse at 50% 45%,rgba(10,14,28,.82),rgba(5,6,11,.97));
   backdrop-filter:blur(3px);
 }
 #overlay.gone{display:none}
+#sheet{
+  margin:auto;flex-shrink:0;
+  display:flex;flex-direction:column;align-items:center;gap:18px;
+  width:100%;max-width:360px;
+}
+#overlay.done #howto{display:none}       /* the recap doesn't need the instructions */
+#footer{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:4px}
 #title{
   font-size:clamp(44px,15vw,88px);font-weight:700;line-height:.86;
   letter-spacing:-.045em;margin:0;
@@ -110,7 +122,7 @@ canvas{display:block;width:100%;height:100%}
   text-wrap:pretty;                  /* keeps a lone word off the last line */
 }
 #go{
-  pointer-events:auto;margin-top:6px;
+  pointer-events:auto;
   background:transparent;border:1px solid var(--ice);color:var(--ice);
   font-family:inherit;font-size:14px;letter-spacing:.16em;
   padding:14px 34px;border-radius:99px;cursor:pointer;
@@ -122,8 +134,8 @@ canvas{display:block;width:100%;height:100%}
   pointer-events:auto;display:none;
   background:none;border:0;color:var(--paper);opacity:.42;
   font-family:inherit;font-size:12px;letter-spacing:.1em;
-  padding:10px 14px;margin-top:-4px;cursor:pointer;
-  border-bottom:1px solid rgba(232,240,255,.22);
+  padding:8px 14px;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;
 }
 #clearghost:active{opacity:.85;color:var(--rose)}
 #audiorow{display:flex;gap:8px;pointer-events:auto}
@@ -134,15 +146,19 @@ canvas{display:block;width:100%;height:100%}
   padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);
 }
 .toggle:active{background:rgba(47,227,255,.2)}
-#board{display:none;width:min(320px,86vw);pointer-events:auto;text-align:left;font-size:13px}
+#board{
+  display:none;width:100%;pointer-events:auto;text-align:left;font-size:14px;
+  background:rgba(232,240,255,.04);border:1px solid rgba(232,240,255,.12);border-radius:14px;
+  padding:14px 12px 10px;
+}
 #board.on{display:block}
-#boardhead{font-size:11px;letter-spacing:.3em;opacity:.5;text-align:center;margin-bottom:8px}
+#boardhead{font-size:11px;letter-spacing:.3em;opacity:.55;text-align:center;margin-bottom:10px}
 #boardlist{list-style:none;margin:0;padding:0}
-#boardlist li,#boardme{display:flex;gap:10px;padding:4px 8px;border-radius:8px;font-variant-numeric:tabular-nums}
+#boardlist li,#boardme{display:flex;gap:10px;padding:6px 10px;border-radius:8px;font-variant-numeric:tabular-nums}
 #boardlist li.me,#boardme{background:rgba(47,227,255,.08);color:var(--ice)}
 #board .rank{width:2ch;opacity:.5;text-align:right}
 #board .who{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#board .tag{opacity:.4;font-size:11px}
+#board .tag{opacity:.4;font-size:12px}
 #board .time{opacity:.9}
 #boardme{margin-top:6px;border-top:1px solid rgba(232,240,255,.1)}
 #boardstatus{text-align:center;opacity:.5;font-size:12px;padding:6px 0}
@@ -187,5 +203,11 @@ canvas{display:block;width:100%;height:100%}
 }
 #devpanel button:active{background:rgba(47,227,255,.2)}
 /* DEV PANEL CSS END */
+
+@media (max-height:720px){
+  #detail{display:none}                  /* keep the race button and the board in reach on phones */
+  #title{font-size:clamp(40px,12vw,64px)}
+  #sheet{gap:14px}
+}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}

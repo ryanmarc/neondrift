@@ -39,53 +39,57 @@
   <button class="btn" id="guidetoggle">Guides: on</button>
 
   <div id="overlay">
-    <div>
-      <h1 id="title">NEON<br>DRIFT</h1>
-      <div id="seed"></div>
-      <div id="line"></div>
-      <div id="next"></div>
-    </div>
-    <div id="howto">
-      <p id="rule">Hold <b>either side</b> of the screen to turn.</p>
-      <p id="aside">That's the whole game.</p>
-      <p id="detail">Keep holding and the back steps out. Sliding costs you speed but fills the boost meter. Let go and the car straightens itself, spending whatever boost you earned.</p>
-    </div>
-    <div id="result"></div>
-    <button id="go">TAP TO RACE</button>
-    <button id="clearghost">Clear saved ghost</button>
-    <div id="audiorow">
-      <button class="toggle" id="overlaySfx">Sound FX: on</button>
-      <button class="toggle" id="overlayMusic">Music: on</button>
-    </div>
-    <div id="board">
-      <div id="boardhead">LEADERBOARD</div>
-      <ol id="boardlist"></ol>
-      <div id="boardme"></div>
-      <div id="boardstatus"></div>
-      <div id="namerow">
-        <input type="text" id="namebox" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
-        <button type="button" id="postname">Post time</button>
-        <button type="button" id="skipname" class="link">Not now</button>
+    <div id="sheet">
+      <div id="titleblock">
+        <h1 id="title">NEON<br>DRIFT</h1>
+        <div id="seed"></div>
+        <div id="line"></div>
+        <div id="next"></div>
       </div>
-      <div id="devices">
-        <button type="button" class="link" id="pairstart">Play on another device</button>
-        <button type="button" class="link" id="pairclaim">Enter a code</button>
-        <button type="button" class="link" id="rename">Change name</button>
+      <div id="howto">
+        <p id="rule">Hold <b>either side</b> of the screen to turn.</p>
+        <p id="aside">That's the whole game.</p>
+        <p id="detail">Keep holding and the back steps out. Sliding costs you speed but fills the boost meter. Let go and the car straightens itself, spending whatever boost you earned.</p>
       </div>
-      <div id="pairbox"></div>
-    </div>
+      <div id="result"></div>
+      <button id="go">TAP TO RACE</button>
+      <div id="board">
+        <div id="boardhead">LEADERBOARD</div>
+        <ol id="boardlist"></ol>
+        <div id="boardme"></div>
+        <div id="boardstatus"></div>
+        <div id="namerow">
+          <input type="text" id="namebox" maxlength="16" placeholder="your name" autocomplete="off" spellcheck="false">
+          <button type="button" id="postname">Post time</button>
+          <button type="button" id="skipname" class="link">Not now</button>
+        </div>
+        <div id="devices">
+          <button type="button" class="link" id="pairstart">Play on another device</button>
+          <button type="button" class="link" id="pairclaim">Enter a code</button>
+          <button type="button" class="link" id="rename">Change name</button>
+        </div>
+        <div id="pairbox"></div>
+      </div>
+      <div id="footer">
+        <div id="audiorow">
+          <button class="toggle" id="overlaySfx">Sound FX: on</button>
+          <button class="toggle" id="overlayMusic">Music: on</button>
+        </div>
+        <button id="clearghost">Clear saved ghost</button>
+      </div>
 
-    <!-- DEV PANEL START — temporary test controls. To remove: delete this block,
-         the #devpanel CSS block, and the DEV PANEL script block at the end. -->
-    <div id="devpanel">
-      <label id="devGuidesRow"><input type="checkbox" id="devGuides"> Show drift guides</label>
-      <div id="devSeedRow">
-        <input type="text" id="devSeed" placeholder="seed" autocomplete="off" spellcheck="false">
-        <button id="devLoad" type="button">Load</button>
-        <button id="devRandom" type="button">Random</button>
+      <!-- DEV PANEL START — temporary test controls. To remove: delete this block,
+           the #devpanel CSS block, and the DEV PANEL script block at the end. -->
+      <div id="devpanel">
+        <label id="devGuidesRow"><input type="checkbox" id="devGuides"> Show drift guides</label>
+        <div id="devSeedRow">
+          <input type="text" id="devSeed" placeholder="seed" autocomplete="off" spellcheck="false">
+          <button id="devLoad" type="button">Load</button>
+          <button id="devRandom" type="button">Random</button>
+        </div>
       </div>
+      <!-- DEV PANEL END -->
     </div>
-    <!-- DEV PANEL END -->
   </div>
 </div>
 
