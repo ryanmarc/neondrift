@@ -1,15 +1,11 @@
-// The one AudioContext, its master gain, the mute switch and the hidden-tab
-// suspend. Both the sound effects and the music hang off this, so a single tap
-// unlocks everything (iOS refuses to start audio outside a real tap handler,
-// and deferring it even one frame fails).
+// The one AudioContext, its master gain and the hidden-tab suspend. Both the
+// sound effects and the music hang off this, so a single tap unlocks everything
+// (iOS refuses to start audio outside a real tap handler, and deferring it even
+// one frame fails). Effects and music each have their own on/off bus below it.
 
-import * as storage from "../core/storage.js";
-
-const MUTE_KEY = "neondrift:mute";
 const MASTER_GAIN = 0.9;
 
 let ctx = null, master = null;
-let muted = storage.read(MUTE_KEY) === "1";
 const pending = [];   // callbacks waiting for the context to exist
 
 export function getContext() { return ctx; }
@@ -26,21 +22,32 @@ export function unlock() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
-    master = ctx.createGain(); master.gain.value = muted ? 0 : MASTER_GAIN; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = MASTER_GAIN; master.connect(ctx.destination);
     for (const fn of pending) fn(ctx, master);
     pending.length = 0;
   }
   if (ctx.state === "suspended") ctx.resume();
 }
 
-export function isMuted() { return muted; }
-
-/** Flip mute for everything, persist it, and return the new state. */
-export function toggleMute() {
-  muted = !muted;
-  storage.write(MUTE_KEY, muted ? "1" : "0");
-  if (master) master.gain.setTargetAtTime(muted ? 0 : MASTER_GAIN, ctx.currentTime, 0.05);
-  return muted;
+/**
+ * Get music going on the title screen. Browsers won't run audio before the
+ * user has interacted with the page, so this creates the context now (it may
+ * start suspended) and resumes it on the first click, tap or key anywhere.
+ * Sites the user has played sound on before are usually allowed to start at
+ * once, in which case the listeners are never needed.
+ */
+export function armAutoplay() {
+  unlock();
+  if (!ctx || ctx.state === "running") return;
+  const kick = () => {
+    unlock();
+    if (ctx.state === "running") for (const ev of EVENTS) removeEventListener(ev, kick, true);
+  };
+  const EVENTS = ["pointerdown", "touchend", "keydown", "click"];
+  for (const ev of EVENTS) addEventListener(ev, kick, true);
+  ctx.addEventListener("statechange", () => {
+    if (ctx.state === "running") for (const ev of EVENTS) removeEventListener(ev, kick, true);
+  });
 }
 
 export function suspend() { if (ctx && ctx.state === "running") ctx.suspend(); }

@@ -7,16 +7,23 @@
 
 import { clamp } from "../core/math.js";
 import { on } from "../core/events.js";
+import * as storage from "../core/storage.js";
 import { whenReady } from "./context.js";
+
+const MUTE_KEY = "neondrift:mute";
 
 let ctx = null, master = null, noiseBuf = null, noiseSrc = null;
 let squealF = null, squealG = null, harmF = null, harmG = null, scrubF = null, scrubG = null;
 let offF = null, offG = null, airF = null, airG = null, lfo = null, lfoG = null;
 let ready = false;
+let muted = storage.read(MUTE_KEY) === "1";
 
-// Build the persistent nodes as soon as the shared context exists.
+// Build the persistent nodes as soon as the shared context exists. `master`
+// here is the effects bus: everything below joins it, and the mute switch is
+// its gain, so music is unaffected.
 whenReady((c, m) => {
-  ctx = c; master = m;
+  ctx = c;
+  master = ctx.createGain(); master.gain.value = muted ? 0 : 1; master.connect(m);
 
   const len = Math.floor(ctx.sampleRate * 2);
   noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -126,9 +133,19 @@ on("countdown", count);
 
 // ---------- public API ----------
 
-// Context lifecycle (unlock, mute, suspend) lives in context.js; re-exported so
-// call sites can keep treating this module as "the sound".
-export { unlock, isMuted, toggleMute, suspend, resume } from "./context.js";
+// Context lifecycle (unlock, suspend) lives in context.js; re-exported so call
+// sites can keep treating this module as "the sound".
+export { unlock, suspend, resume } from "./context.js";
+
+export function isMuted() { return muted; }
+
+/** Flip the effects on or off, persist it, and return the new muted state. */
+export function toggleMute() {
+  muted = !muted;
+  storage.write(MUTE_KEY, muted ? "1" : "0");
+  if (master) master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05);
+  return muted;
+}
 
 /** Per-frame parameter update for the continuous sounds. Pass zeros when not racing. */
 export function update(drift, speed, off, boosting) {

@@ -125,6 +125,14 @@ canvas{display:block;width:100%;height:100%}
   border-bottom:1px solid rgba(232,240,255,.22);
 }
 #clearghost:active{opacity:.85;color:var(--rose)}
+#audiorow{display:flex;gap:8px;pointer-events:auto}
+.toggle{
+  background:rgba(232,240,255,.06);border:1px solid rgba(232,240,255,.16);
+  color:var(--paper);border-radius:11px;
+  font-family:inherit;font-size:12px;letter-spacing:.06em;
+  padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);
+}
+.toggle:active{background:rgba(47,227,255,.2)}
 #result{font-size:15px;line-height:1.7;opacity:.85;min-height:1px}
 #result .big{display:block;font-size:40px;font-weight:700;letter-spacing:-.02em;color:var(--paper);font-variant-numeric:tabular-nums}
 #result .pb{color:var(--amber)}

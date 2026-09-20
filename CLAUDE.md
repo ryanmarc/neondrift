@@ -23,6 +23,11 @@ single-file original).
 Serve it rather than opening the file from disk — `localStorage` (used for ghosts
 and best times) behaves inconsistently under `file://` in some browsers.
 
+**After editing a module, hard-reload (Cmd+Shift+R).** `http.server` sends no
+`Cache-Control`, so Chrome keeps module scripts for a while under its heuristic
+freshness rule and a plain reload can run stale code. "The change didn't take"
+has meant exactly this twice.
+
 ## URL params
 
 - `?seed=2026-12-25` — force a specific track. Any string works; it is only ever
@@ -178,6 +183,13 @@ Conventions:
   between menu / race / boost states. Notes are scheduled ~200ms ahead on the
   audio clock from an 80ms timer; nodes are made per note, not per frame. Kick
   and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
+- **Title-screen music is best-effort.** `armAutoplay()` creates the context at
+  boot and resumes it on the first click, tap or key anywhere. Browsers refuse
+  to start audio before any interaction, so a fresh visitor's title screen is
+  silent until they touch something; returning visitors usually get it at once.
+- **Effects and music are separate switches** on separate buses under one
+  master: `neondrift:mute` is the effects bus, `neondrift:music` the music bus.
+  Every audio button (HUD and overlay) goes through `syncAudioButtons()`.
 - **Audio must unlock inside a real tap handler.** iOS refuses to start an
   `AudioContext` otherwise, and deferring it even one frame fails. `SFX.unlock()`
   (really `audio/context.js`) is called from the play, restart, mute and music
@@ -303,7 +315,7 @@ keyboard tablets wrong.
 - `neondrift:t<trackId>:best` — best time for that track geometry
 - `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
 - `neondrift:t<trackId>:line:v<n>-<hash>` — optimal line markers for that geometry + physics
-- `neondrift:mute` — sound preference (everything), global
+- `neondrift:mute` — sound effects on/off, global
 - `neondrift:music` — music on/off, global
 
 Wrap every read in try/catch and render correctly when storage is empty.

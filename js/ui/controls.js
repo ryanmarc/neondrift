@@ -28,19 +28,16 @@ export function setGuidesVisible(v) {
   if (v) ensureLine();
 }
 
-const $mute = $("mute");
-$mute.textContent = "Sound: " + (SFX.isMuted() ? "off" : "on");
-$mute.addEventListener("click", e => {
-  e.stopPropagation(); SFX.unlock();
-  $mute.textContent = "Sound: " + (SFX.toggleMute() ? "off" : "on");
-});
-
-const $music = $("musictoggle");
-$music.textContent = "Music: " + (Music.isEnabled() ? "on" : "off");
-$music.addEventListener("click", e => {
-  e.stopPropagation(); SFX.unlock();
-  $music.textContent = "Music: " + (Music.toggle() ? "on" : "off");
-});
+// Effects and music each have a button in the HUD and one on the overlay
+// (title and end screens). All four read from the same two switches.
+const $fx = [$("mute"), $("overlaySfx")], $mu = [$("musictoggle"), $("overlayMusic")];
+function syncAudioButtons() {
+  for (const b of $fx) b.textContent = "Sound FX: " + (SFX.isMuted() ? "off" : "on");
+  for (const b of $mu) b.textContent = "Music: " + (Music.isEnabled() ? "on" : "off");
+}
+for (const b of $fx) b.addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); SFX.toggleMute(); syncAudioButtons(); });
+for (const b of $mu) b.addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); Music.toggle(); syncAudioButtons(); });
+syncAudioButtons();
 
 const $cam = $("camtoggle");
 $cam.addEventListener("click", e => {
