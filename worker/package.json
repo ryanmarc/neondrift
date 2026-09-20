@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute neondrift --file=./schema.sql",
+    "db:init": "wrangler d1 execute neondrift --remote --file=./schema.sql",
     "db:init:local": "wrangler d1 execute neondrift --local --file=./schema.sql"
   },
   "devDependencies": {

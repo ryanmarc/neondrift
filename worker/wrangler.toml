@@ -8,7 +8,7 @@ ALLOWED_ORIGINS = "https://ryanmarc.github.io"
 [[d1_databases]]
 binding = "DB"
 database_name = "neondrift"
-database_id = "REPLACE-WITH-THE-ID-FROM-wrangler-d1-create"
+database_id = "95cd3136-5fd2-4b58-98fd-e2c57d2b7e2e"
 
 [[unsafe.bindings]]
 name = "POST_LIMIT"

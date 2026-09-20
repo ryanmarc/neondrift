@@ -44,4 +44,4 @@ export const GUIDES_FLAG = false || QS.has("guides");
 export const DEV_FLAG = false || QS.has("dev");
 
 // Leaderboard API. Empty string disables the leaderboard entirely.
-export const API_URL = "";
+export const API_URL = "https://neondrift-api.rolux.workers.dev";
