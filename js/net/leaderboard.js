@@ -6,6 +6,8 @@ import { on, emit } from "../core/events.js";
 import { track } from "../track/track.js";
 import * as api from "./api.js";
 import * as identity from "./identity.js";
+import * as storage from "../core/storage.js";
+import { setRival } from "../game/ghost.js";
 
 export const board = {
   status: api.apiEnabled() ? "loading" : "off",   // off | loading | ready | unavailable
@@ -15,7 +17,28 @@ export const board = {
   pending: null,      // a PB waiting for a name before it can be posted
   lastSubmit: null,   // { accepted, improved, rank, reason } from the last post
   pairing: null,      // { code, expires } while a pairing code is showing
+  rival: null,        // { id, name, tag, time, status: loading | ready | failed } — chosen leaderboard ghost
 };
+
+const rivalKey = () => "neondrift:t" + track.id + ":rival";
+const ghostCache = new Map();   // "trackId/playerId" → fetched ghost, for the session
+
+/** Fetch a leaderboard run and race it; null clears back to your own ghost. */
+export async function chooseRival(playerId) {
+  if (!playerId) {
+    board.rival = null; setRival(null); storage.remove(rivalKey()); changed(); return;
+  }
+  const id = track.id, key = id + "/" + playerId;
+  board.rival = { id: playerId, name: "", tag: playerId.slice(0, 4), time: null, status: "loading" }; changed();
+  storage.write(rivalKey(), playerId);
+  let g = ghostCache.get(key);
+  if (!g) { g = await api.fetchGhost(id, playerId); if (g && !g.error) ghostCache.set(key, g); }
+  if (id !== track.id || !board.rival || board.rival.id !== playerId) return;   // changed mind meanwhile
+  if (!g || g.error) { board.rival.status = "failed"; setRival(null); changed(); return; }
+  board.rival = { id: playerId, name: g.name, tag: g.tag, time: g.time, status: "ready" };
+  setRival({ id: playerId, name: g.name, tag: g.tag, time: g.time, data: g.ghost });
+  changed();
+}
 
 const changed = () => emit("board-updated");
 
@@ -83,7 +106,12 @@ export async function claimPairingCode(code) {
   return true;
 }
 
-on("track-loaded", () => { board.top = []; board.me = null; board.pending = null; board.lastSubmit = null; refreshBoard(); });
+on("track-loaded", () => {
+  board.top = []; board.me = null; board.pending = null; board.lastSubmit = null; board.rival = null;
+  refreshBoard();
+  const remembered = storage.read(rivalKey());
+  if (remembered && api.apiEnabled()) chooseRival(remembered);
+});
 on("race-finish", (result) => {
   if (!api.apiEnabled() || !result.isPB) return;
   if (identity.getName()) submit(result);

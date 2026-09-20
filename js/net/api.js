@@ -32,6 +32,8 @@ async function call(path, { method = "GET", body = null } = {}) {
 export const postRun = (body) => call("/runs", { method: "POST", body });
 export const fetchBoard = (trackId, playerId) =>
   call("/board?track=" + encodeURIComponent(trackId) + (playerId ? "&player=" + playerId : ""));
+export const fetchGhost = (trackId, playerId) =>
+  call("/ghost?track=" + encodeURIComponent(trackId) + "&player=" + playerId);
 export const postName = (secret, name) => call("/name", { method: "POST", body: { secret, name } });
 export const pairStart = (secret) => call("/pair/start", { method: "POST", body: { secret } });
 export const pairClaim = (code) => call("/pair/claim", { method: "POST", body: { code } });

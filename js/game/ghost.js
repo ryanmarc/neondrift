@@ -10,7 +10,17 @@ export const ghost = {
   data: null,       // flat [x, y, angle, progress, ...] or null
   bestTime: null,   // seconds, or null if no run saved for this track
   inputs: null,     // the saved best run's input changes, or null
+  rival: null,      // { id, name, tag, time, data } — a leaderboard run raced instead of your own
 };
+
+/** Race this run instead of your own ghost (null to go back to your own). */
+export function setRival(rival) { ghost.rival = rival; }
+
+/** The recording currently being raced: the rival's if one is set, else your own. */
+function activeData() { return ghost.rival ? ghost.rival.data : ghost.data; }
+
+/** The time the live delta and "Best" line compare against, or null. */
+export function targetTime() { return ghost.rival ? ghost.rival.time : ghost.bestTime; }
 
 let keyBest = "", keyGhost = "", keyInputs = "";
 
@@ -19,7 +29,7 @@ export function loadGhost(trackId) {
   keyBest = "neondrift:t" + trackId + ":best";
   keyGhost = "neondrift:t" + trackId + ":ghost";
   keyInputs = "neondrift:t" + trackId + ":inputs";
-  ghost.data = null; ghost.bestTime = null; ghost.inputs = null;
+  ghost.data = null; ghost.bestTime = null; ghost.inputs = null; ghost.rival = null;
   const b = storage.read(keyBest); if (b) ghost.bestTime = parseFloat(b);
   const g = storage.read(keyGhost); if (g) { try { ghost.data = JSON.parse(g); } catch { /* corrupt: ignore */ } }
   const i = storage.read(keyInputs); if (i) { try { ghost.inputs = JSON.parse(i); } catch { /* corrupt: ignore */ } }
@@ -52,7 +62,7 @@ export function commitRun(time, rec, inputs) {
 
 /** Ghost pose at race time t, interpolated between recorded frames. */
 export function ghostAt(t) {
-  const g = ghost.data;
+  const g = activeData();
   if (!g) return null;
   const f = t * GHOST_HZ, i = Math.floor(f);
   if (i >= g.length / 4 - 1) return null;
@@ -65,7 +75,7 @@ export function ghostAt(t) {
  * Lets the live delta compare the same point on track rather than the same clock.
  */
 export function ghostTimeAtProgress(pr) {
-  const g = ghost.data;
+  const g = activeData();
   if (!g) return null;
   const frames = g.length / 4;
   for (let i = 1; i < frames; i++) {

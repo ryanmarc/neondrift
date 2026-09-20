@@ -1,4 +1,4 @@
-// Neon Drift leaderboard API. Five routes, JSON in and out, CORS to the game's
+// Neon Drift leaderboard API. Six routes, JSON in and out, CORS to the game's
 // origin, per-IP rate limits on writes. Times are never trusted: /runs
 // replays the submitted inputs through the game's physics and stores what
 // that produces.
@@ -77,7 +77,8 @@ async function getBoard(url, env) {
   const player = url.searchParams.get("player");
   if (!v.validTrackId(trackId)) return bad("invalid-track");
   const rows = await db.topRuns(env.DB, trackId, TOP_N);
-  const top = rows.map(r => ({ name: r.name, tag: r.id.slice(0, 4), time: r.time, at: r.at }));
+  // `id` is the sha256 player id — public by design (it is what /ghost is keyed on), never the secret.
+  const top = rows.map(r => ({ id: r.id, name: r.name, tag: r.id.slice(0, 4), time: r.time, at: r.at }));
   let me = null;
   if (player && /^[0-9a-f]{64}$/.test(player)) {
     const inTop = rows.findIndex(r => r.id === player);
@@ -89,6 +90,17 @@ async function getBoard(url, env) {
     }
   }
   return json({ top, me, rankCap: db.RANK_CAP });
+}
+
+async function getGhost(url, env) {
+  const trackId = url.searchParams.get("track");
+  const player = url.searchParams.get("player");
+  if (!v.validTrackId(trackId) || !player || !/^[0-9a-f]{64}$/.test(player)) return bad("invalid-ghost");
+  const row = await db.ghostFor(env.DB, trackId, player);
+  if (!row) return bad("not-found", 404);
+  let ghost;
+  try { ghost = JSON.parse(row.ghost); } catch { return bad("corrupt-ghost", 500); }
+  return json({ id: player, name: row.name, tag: player.slice(0, 4), time: row.time, ghost });
 }
 
 async function postName(body, env) {
@@ -132,6 +144,7 @@ export default {
     };
     try {
       if (request.method === "GET" && url.pathname === "/board") return withCors(() => getBoard(url, env));
+      if (request.method === "GET" && url.pathname === "/ghost") return withCors(() => getGhost(url, env));
       if (request.method === "POST") {
         if (url.pathname === "/pair/claim" && await limited(env.CLAIM_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
         if (await limited(env.POST_LIMIT, request)) return withCors(() => bad("rate-limited", 429));

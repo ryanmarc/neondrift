@@ -9,7 +9,7 @@ import { LAPS, T_TICK, T_GO } from "../config/tuning.js";
 import { SEED_OVERRIDE, todayUtc, describeUntilRollover } from "../config/params.js";
 import { track } from "../track/track.js";
 import { car, race } from "../game/state.js";
-import { ghost, ghostTimeAtProgress, clearGhost } from "../game/ghost.js";
+import { ghost, ghostTimeAtProgress, clearGhost, targetTime } from "../game/ghost.js";
 import { line } from "../sim/line.js";
 
 const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best");
@@ -19,6 +19,7 @@ const $overlay = $("overlay"), $result = $("result"), $go = $("go"), $seed = $("
 const $rule = $("rule"), $clear = $("clearghost"), $line = $("line"), $next = $("next");
 
 export const fmt = t => t.toFixed(2);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // ---------- per-frame readouts ----------
 
@@ -29,7 +30,8 @@ export function updateHud() {
   $fill.style.width = (car.boost * 100) + "%";
   $fill.style.opacity = car.boost < 0.004 ? "0" : "1";
   $fill.classList.toggle("hot", car.boosting);
-  $best.textContent = ghost.bestTime != null ? "Best " + fmt(ghost.bestTime) : "";
+  if (ghost.rival) $best.innerHTML = "vs " + esc(ghost.rival.name) + '<span class="tag">#' + esc(ghost.rival.tag) + "</span> " + fmt(ghost.rival.time);
+  else $best.textContent = ghost.bestTime != null ? "Best " + fmt(ghost.bestTime) : "";
 
   const gt = ghostTimeAtProgress(car.lap - 1 + car.prog);
   if (gt != null && race.running && race.countdown <= 0) {
@@ -139,14 +141,21 @@ $clear.addEventListener("click", e => {
   syncClear();
 });
 
+const deltaLine = (d, who) =>
+  '<span class="' + (d < 0 ? "faster" : "slower") + '">' + (d < 0 ? "−" : "+") + Math.abs(d).toFixed(2) + '</span>'
+  + '<span class="note"> ' + (d < 0 ? "on " : "off ") + who + "</span>";
+
 function showResult({ time, prevBest, isPB }) {
   let line;
-  if (prevBest == null) {
+  if (ghost.rival) {
+    // raced a leaderboard ghost: that comparison leads, your own best is the footnote
+    line = deltaLine(time - ghost.rival.time, esc(ghost.rival.name) + '<span class="tag">#' + esc(ghost.rival.tag) + "</span> " + fmt(ghost.rival.time));
+    if (prevBest != null) line += '<br><span class="note">' + (isPB ? "New personal best." : "Your best is " + fmt(prevBest) + ".") + "</span>";
+    else line += '<br><span class="note">Your ghost is saved.</span>';
+  } else if (prevBest == null) {
     line = '<span class="note">First run on this track. Your ghost is saved.</span>';
   } else {
-    const d = time - prevBest;
-    line = '<span class="' + (d < 0 ? "faster" : "slower") + '">' + (d < 0 ? "−" : "+") + Math.abs(d).toFixed(2) + '</span>'
-         + '<span class="note"> ' + (d < 0 ? "on your best of " + fmt(prevBest) : "off your best of " + fmt(prevBest)) + '</span>';
+    line = deltaLine(time - prevBest, "your best of " + fmt(prevBest));
   }
   $result.innerHTML = '<span class="big' + (isPB ? ' pb' : '') + '">' + fmt(time) + '</span>' + line;
   $go.textContent = "RACE AGAIN";

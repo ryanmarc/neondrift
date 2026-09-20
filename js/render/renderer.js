@@ -8,7 +8,7 @@ import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { line } from "../sim/line.js";
 import { car, race } from "../game/state.js";
-import { ghostAt } from "../game/ghost.js";
+import { ghost, ghostAt } from "../game/ghost.js";
 import { camera, updateCamera } from "./camera.js";
 
 const COLOR = {
@@ -18,6 +18,7 @@ const COLOR = {
   tireMark: "rgba(165,190,245,.16)",
   startLine: "rgba(232,240,255,.16)",
   ghostBody: "rgba(47,227,255,.30)", ghostGlow: "rgba(47,227,255,.07)",
+  rivalBody: "rgba(255,47,158,.45)", rivalGlow: "rgba(255,47,158,.10)",
   offTint: "rgba(255,47,158,.10)",
 };
 const EDGES = [[1, COLOR.ice], [-1, COLOR.rose]];   // [side, colour]
@@ -95,7 +96,11 @@ export function draw(dt, alpha) {
   drawStartLine(S[0]);
 
   const gp = ghostAt(race.time);
-  if (gp) drawCar(gp.x, gp.y, gp.a, COLOR.ghostBody, COLOR.ghostGlow, true);
+  if (gp) {
+    const rival = ghost.rival;
+    // a rival is rose, your own ghost ice; the HUD's "vs" line carries the name
+    drawCar(gp.x, gp.y, gp.a, rival ? COLOR.rivalBody : COLOR.ghostBody, rival ? COLOR.rivalGlow : COLOR.ghostGlow, true);
+  }
 
   drawPlume();
   drawCar(rx, ry, ra, COLOR.paper, car.boosting ? COLOR.amber : COLOR.ice, false);

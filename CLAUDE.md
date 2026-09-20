@@ -77,6 +77,10 @@ relatively, or inline it as a `data:` URI.
 - **Ghost** is your best run on this exact track, recorded as `[x, y, angle,
   progress]` at 30Hz into `localStorage`. Progress is stored so the live delta
   can compare times at the same point on track rather than the same timestamp.
+- **Rival ghost.** Tapping a leaderboard row fetches that run's recording and
+  races it *instead of* your own ghost (drawn in rose, no label — the HUD names them); the
+  live delta, the "vs" line and the end-screen comparison follow it. Your own
+  best still saves as usual. Remembered per track in `neondrift:t<id>:rival`.
 
 ## Architecture
 
@@ -317,6 +321,7 @@ keyboard tablets wrong.
 - `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
 - `neondrift:t<trackId>:line:v<n>-<hash>` — optimal line markers for that geometry + physics
 - `neondrift:t<trackId>:inputs` — the best run's input changes (what the leaderboard replays)
+- `neondrift:t<trackId>:rival` — player id of the leaderboard ghost chosen for that track
 - `neondrift:player` — the leaderboard secret; `sha256` of it is the player id
 - `neondrift:name` — the display name
 - `neondrift:mute` — sound effects on/off, global
@@ -376,7 +381,8 @@ A Cloudflare Worker with D1. It imports the game's `dynamics.js`, `track.js`
 and `tuning.js` by relative path and verifies every submitted run by replaying
 its recorded inputs; the replayed time is what gets stored. Routes are in
 `worker/src/index.js`: `POST /runs`, `GET /board`, `POST /name`,
-`POST /pair/start`, `POST /pair/claim`. CORS is limited to `ALLOWED_ORIGINS`
+`POST /pair/start`, `POST /pair/claim`, and `GET /ghost` (a stored run's
+recording, for racing a leaderboard ghost). CORS is limited to `ALLOWED_ORIGINS`
 in `wrangler.toml`: the GitHub Pages origin in production, localhost only
 under `wrangler dev --env dev`. Writes are rate limited per IP.
 
@@ -387,10 +393,11 @@ a simulated D1 under `worker/.wrangler/`, never production.
 `node test/make-run.mjs <seed>` writes a genuine run to `/tmp/run.json` for
 `curl` tests.
 
-Deploying: `wrangler d1 create neondrift` once and paste the id into
-`wrangler.toml`; `npm run db:init`; then connect the repo in the Cloudflare
-dashboard (Workers & Pages → Create → Connect GitHub) with the root directory
-set to `worker/`. Set `API_URL` to the worker's URL.
+**Deploys are automatic and only automatic.** The repo is connected to
+Cloudflare (Workers & Pages → Connect GitHub, root `worker/`), so a push to
+`main` deploys the worker. Never run `wrangler deploy` by hand; there is no
+deploy script on purpose. Schema changes are the exception: apply them with
+`npm run db:init` (idempotent `schema.sql`) when asked.
 
 Tests: `node --test "test/*.test.mjs"` covers the input recording, the replay (a genuine
 run replays to the identical time; tampering, wrong claims and unfinished runs
