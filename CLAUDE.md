@@ -377,7 +377,8 @@ and `tuning.js` by relative path and verifies every submitted run by replaying
 its recorded inputs; the replayed time is what gets stored. Routes are in
 `worker/src/index.js`: `POST /runs`, `GET /board`, `POST /name`,
 `POST /pair/start`, `POST /pair/claim`. CORS is limited to `ALLOWED_ORIGINS`
-in `wrangler.toml` plus localhost; writes are rate limited per IP.
+in `wrangler.toml`: the GitHub Pages origin in production, localhost only
+under `wrangler dev --env dev`. Writes are rate limited per IP.
 
 Run it locally: `cd worker && npm install && npm run db:init:local && npm run dev`,
 then set `API_URL` in `config/params.js` to `http://localhost:8787` (and set it
