@@ -41,7 +41,7 @@ const MIX = {
   race:  { bus: 1.0,  filter: 2600, arp: 1.0,  pad: 0.8, bass: 1.0, drums: 1.0 },
   boost: { bus: 1.0,  filter: 5200, arp: 1.3,  pad: 0.8, bass: 1.0, drums: 1.0 },
 };
-const BUS_GAIN = 0.28;              // the whole music under the effects (was 0.42; "a bit quieter")
+const BUS_GAIN = 0.35;              // the whole music under the effects (0.42 was too loud, 0.28 too quiet)
 
 let ctx = null;
 let bus = null, tone = null, filter = null;               // bus ← filter ← tone layers; drums → bus
