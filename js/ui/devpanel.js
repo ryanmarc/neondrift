@@ -3,7 +3,7 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { TODAY } from "../config/params.js";
+import { TODAY, DEV_FLAG } from "../config/params.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { car, race } from "../game/state.js";
@@ -12,10 +12,13 @@ import { camera } from "../render/camera.js";
 import { loadTrack, start, tick } from "../game/race.js";
 import { setGuidesVisible } from "./controls.js";
 import { setSeedOverride } from "./hud.js";
+import { line, ensureLine } from "../sim/line.js";
 
 const cb = $("devGuides");
 const box = $("devSeed");
 const $result = $("result"), $go = $("go");
+
+$("devpanel").classList.toggle("on", DEV_FLAG);   // hidden unless the flag is set
 
 cb.checked = guides.visible;
 cb.addEventListener("change", () => setGuidesVisible(cb.checked));
@@ -40,4 +43,4 @@ box.addEventListener("keydown", e => {
 box.addEventListener("keyup", e => e.stopPropagation());
 
 // Poke at live state from the browser console: window.neon.car, .race, .track…
-window.neon = { car, race, track, ghost, guides, camera, loadTrack, start, tick };
+window.neon = { car, race, track, ghost, guides, camera, line, loadTrack, start, tick, ensureLine };

@@ -28,7 +28,10 @@ and best times) behaves inconsistently under `file://` in some browsers.
 - `?seed=2026-12-25` — force a specific track. Any string works; it is only ever
   hashed into the PRNG seed.
 - `?seed=random` — a new track every load.
-- `?guides` — show the drift guide markers (corner entry/exit hints).
+- `?dev` — show the dev panel (seed loader, guides checkbox) on the start
+  screen. Hidden by default; `DEV_FLAG` in `config/params.js`.
+- `?guides` — show the drift guide markers. Turning guides on also computes
+  the optimal line for the track (see below) and switches the markers to it.
 
 ## Constraints — keep these
 
@@ -103,9 +106,16 @@ js/track/   generator.js  trackFromAmps, buildTrack(rng) — pure
             track.js      `track` {seed, id, samples}, loadTrackGeometry, nearest
             guides.js     `guides` {flag, visible, list}, rebuildGuides
 js/game/    state.js    `car`, `race`, resetRace
+            dynamics.js integrate(car, inp, dt) — the pure car model; createCar, placeCar
             ghost.js    `ghost` {data, bestTime}, loadGhost, commitRun, clearGhost, ghostAt…
-            physics.js  step(dt) — emits boost / chain-break / off-track
+            physics.js  step(dt) — integrate() on the live car + marks, plume, recording, events
             race.js     loadTrack, start, tick(now), run — the per-frame orchestration
+js/sim/     schedule.js input schedules keyed on track progress; createInput, normalize, mutate
+            simulate.js simulate(schedule) and the predictive bootstrap() controller
+            search.js   optimize() (annealing) and polish() (coordinate descent)
+            optimizer.js findLine() — the whole pipeline; LINE_VERSION
+            worker.js   module worker: seed in, markers out
+            line.js     main-thread `line` state, cache, ensureLine()
 js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
@@ -127,6 +137,12 @@ Conventions:
 - **`tick(now)` is the whole frame** and is exported so a run can be driven
   with synthetic timestamps. Chrome pauses `requestAnimationFrame` in hidden
   tabs; from the console, `neon.start(); neon.tick(t)` in a loop still works.
+  Only do that in a hidden tab: if real frames are also running, a synthetic
+  timestamp ahead of the clock gives the next real frame a negative dt.
+- **`dynamics.js` is the only physics.** It has no DOM, no randomness and no
+  module-level game state, which is what lets the same code run the player's
+  car, the optimiser in a worker, and a Node harness. Keep cosmetics (marks,
+  plume, recording) in `physics.js`, not in `integrate()`.
 - The dev panel is one import line in `main.js` plus the marked blocks in
   `index.html` and `style.css`.
 
@@ -209,16 +225,63 @@ just magnified everything instead of showing more.
 
 ### `GUIDE` — drift marker heuristic (behind `?guides`)
 
-Green line = start holding, dashed white = release. **These are a heuristic, not
-a solved optimal line** — each corner is treated independently, so they ignore
-the real trade of sacrificing one corner for speed down the following straight.
-Beating them on some corners is expected.
+Green line = start holding, dashed white = release. **The heuristic is only the
+placeholder** shown while the optimal line is being computed — see the next
+section. Each corner is treated independently and it ignores the gentle bends
+between corners entirely, so a car driven by it alone leaves the road within
+seconds.
 
 | Knob | Does what |
 |---|---|
 | `minRadius` | Corner-detection threshold. Physics says `v²/a` ≈ 414px, but curvature smoothing flattens peaks, so this is calibrated to 520. Across 40 tracks that yields ~6 corners each. |
 | `lead` / `trail` | Seconds before the corner to commit / before its end to release. Derived from `chargeUp` and `slipLagOut`. |
 | `minCorner` | Ignore wiggles shorter than this (px). |
+
+## Optimal line (`js/sim/`)
+
+The physics is deterministic and one-dimensional in input, so the ideal
+markers are found by search rather than guessed: a run is an **input schedule**
+(hold left/right between two track-progress values), and the search minimises
+the simulated three-lap time subject to never leaving the road.
+
+1. **Bootstrap.** A predictive controller drives the track through the real
+   dynamics: every 6 steps it rolls each input forward 120 steps (held, and
+   released after `hold`), scores distance from the centreline plus a big
+   off-road penalty minus progress, and commits to the best. Twelve variants
+   (cost exponent, progress weight, hold length, horizon) are tried and the
+   best one that stays on the road wins. This does most of the work.
+2. **Anneal** (1000 evaluations, seeded from the track id so results are
+   reproducible) then **polish** (coordinate descent on every endpoint).
+3. Replay the winner with tracing; every press/release becomes a marker.
+
+Facts that the design depends on:
+
+- **Schedules are keyed on continuous track progress**, not time, so a change
+  at one corner doesn't misalign every corner after it. Progress is
+  `(sample index + fraction along the sample) / N`, carried in `car.prog`; the
+  quantised version stalled at low speed and made replays diverge.
+- **Replay is stateful** (`createInput`): once a segment is entered it stays
+  active until progress passes its end, because the nearest-sample index can
+  step back by one mid-slide.
+- **The simulator uses a ±6 nearest-point window** where the game uses ±45.
+  They are provably identical for a car on the road (road half-width 132px is
+  inside the tightest corner radius 185px), and ±6 is ~5× faster. Off-road runs
+  are rejected anyway.
+- **Objective = time + 100 × seconds off-road (+200 if unfinished).** The
+  penalty is proportional so the search has a gradient toward the road; the
+  UI reports `feasible` only when off-road time is exactly zero.
+- **Horizon 120 steps (1s) beat both shorter and longer.** Longer horizons
+  score the released rollout over so many steps that every option looks bad.
+- **A long hold is one ≥ `chargeUp`** — that's when traction breaks. Only those
+  are drawn, as the entry/exit marker pair. Shorter steering taps are still in
+  the marker data (`long: false`) but not drawn; they cluttered the corners.
+- **The whole search takes ~7s** on a laptop and runs in a module worker; the
+  result is cached in localStorage under `neondrift:t<id>:line:v<LINE_VERSION>-<physics hash>`,
+  so changing any `T` constant or bumping `LINE_VERSION` recomputes it.
+  Markers are drawn only for the lap being driven.
+
+Benchmarks live outside the repo; the pipeline runs in Node with a two-line
+`location`/`document` stub, since nothing under `sim/` touches the DOM.
 
 ## Input detection
 
@@ -231,6 +294,7 @@ keyboard tablets wrong.
 
 - `neondrift:t<trackId>:best` — best time for that track geometry
 - `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
+- `neondrift:t<trackId>:line:v<n>-<hash>` — optimal line markers for that geometry + physics
 - `neondrift:mute` — sound preference, global
 
 Wrap every read in try/catch and render correctly when storage is empty.
@@ -274,6 +338,8 @@ Wrap every read in try/catch and render correctly when storage is empty.
 
 ## Dev panel (temporary)
 
+Hidden unless `?dev` is on the URL (or `DEV_FLAG` is flipped in
+`config/params.js`); the module still loads so `window.neon` is always there.
 In the module build: the `DEV PANEL START/END` block in `index.html`, the
 `DEV PANEL CSS START/END` block in `style.css`, and `js/ui/devpanel.js` plus
 its import line in `js/main.js`. In `neon-drift.html` the same three blocks are inline, the

@@ -3,9 +3,10 @@
 
 import { $ } from "../core/dom.js";
 import { clamp, lerp, wrapAngle } from "../core/math.js";
-import { ROAD_W, HALF_W } from "../config/tuning.js";
+import { ROAD_W, HALF_W, LAPS } from "../config/tuning.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
+import { line } from "../sim/line.js";
 import { car, race } from "../game/state.js";
 import { ghostAt } from "../game/ghost.js";
 import { camera, updateCamera } from "./camera.js";
@@ -78,12 +79,16 @@ export function draw(dt, alpha) {
   drawTireMarks(inView);
   drawEdges(runs);
 
-  // drift guides, drawn on the road under everything else
+  // drift guides, drawn on the road under everything else: the optimal line's
+  // markers for the lap being driven once they exist, the heuristic until then
   if (guides.visible) {
-    for (const g of guides.list) {
-      const sa = S[g.a], sb = S[g.b];
-      if (inView(sa.x, sa.y)) drawGuide(sa, COLOR.guideEntry, false);
-      if (inView(sb.x, sb.y)) drawGuide(sb, COLOR.paper, true);
+    if (line.status === "ready" && line.markers.length) drawLineMarkers(S, inView);
+    else {
+      for (const g of guides.list) {
+        const sa = S[g.a], sb = S[g.b];
+        if (inView(sa.x, sa.y)) drawGuide(sa, COLOR.guideEntry, false);
+        if (inView(sb.x, sb.y)) drawGuide(sb, COLOR.paper, true);
+      }
     }
   }
 
@@ -156,6 +161,22 @@ function drawGuide(s, col, dashed) {
   cx.lineTo(s.x - s.nx * HALF_W, s.y - s.ny * HALF_W);
   cx.stroke();
   cx.restore();
+}
+
+// Optimal-line markers. Only holds long enough to break traction (a real
+// drift) are shown: a line across the road plus a dot where the car was, green
+// to press, white dashed to release. Short steering taps are in the data too
+// but deliberately not drawn — they cluttered the corners.
+function drawLineMarkers(S, inView) {
+  const lap = clamp(car.lap, 1, LAPS);
+  for (const m of line.markers) {
+    if (!m.long || m.lap !== lap || !inView(m.x, m.y)) continue;
+    const col = m.type === "press" ? COLOR.guideEntry : COLOR.paper;
+    drawGuide(S[m.idx], col, m.type === "release");
+    cx.fillStyle = col; cx.shadowColor = col; cx.shadowBlur = 12;
+    cx.beginPath(); cx.arc(m.x, m.y, 7, 0, Math.PI * 2); cx.fill();
+    cx.shadowBlur = 0;
+  }
 }
 
 function drawStartLine(s0) {

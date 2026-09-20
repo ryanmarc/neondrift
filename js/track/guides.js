@@ -16,7 +16,8 @@ export function rebuildGuides() {
   guides.list = buildGuides(track.samples);
 }
 
-function buildGuides(S) {
+/** Heuristic corner detection on a sample array. Pure; also used to seed the optimiser. */
+export function buildGuides(S) {
   const N = S.length;
   const cur = new Float32Array(N);
   for (let i = 0; i < N; i++) {                    // smooth out sampling noise

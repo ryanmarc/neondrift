@@ -20,3 +20,7 @@ export const INITIAL_SEED = !SEED_OVERRIDE
 // them back (which also restores the on-screen toggle button), or append ?guides
 // to the page URL to enable them without editing this file.
 export const GUIDES_FLAG = false || QS.has("guides");
+
+// FEATURE FLAG: the dev panel (seed loader, guides checkbox) on the start
+// screen. Hidden by default; flip to true here or append ?dev to the URL.
+export const DEV_FLAG = false || QS.has("dev");
