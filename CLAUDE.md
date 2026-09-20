@@ -119,7 +119,9 @@ js/sim/     schedule.js input schedules keyed on track progress; createInput, no
 js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
-js/audio/   sfx.js      unlock, update, isMuted, toggleMute; subscribes to game events
+js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
+            sfx.js      effects: update(); subscribes to game events; re-exports the context API
+            music.js    synthesized synthwave loop; update(live, boosting) picks the mix
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
             controls.js buttons and the R key
             devpanel.js dev panel; also puts `window.neon` up for console poking
@@ -171,9 +173,15 @@ Conventions:
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
   updated via `setTargetAtTime`. Per-frame node creation causes crackling.
+- **Music never restarts; the race changes its mix.** `audio/music.js` keeps
+  one sequencer running from the first tap and ramps gains and a lowpass
+  between menu / race / boost states. Notes are scheduled ~200ms ahead on the
+  audio clock from an 80ms timer; nodes are made per note, not per frame. Kick
+  and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
 - **Audio must unlock inside a real tap handler.** iOS refuses to start an
   `AudioContext` otherwise, and deferring it even one frame fails. `SFX.unlock()`
-  is called from the play, restart and mute click handlers.
+  (really `audio/context.js`) is called from the play, restart, mute and music
+  click handlers; both the effects and the music build their nodes on it.
 - **Feed the audio silence when not racing.** `step()` stops at the finish, so
   `car.drift` and velocity freeze at their last values. Passing those stale
   numbers to `SFX.update()` leaves the skid playing forever. `draw()`'s caller
@@ -295,7 +303,8 @@ keyboard tablets wrong.
 - `neondrift:t<trackId>:best` — best time for that track geometry
 - `neondrift:t<trackId>:ghost` — ghost recording for that track geometry
 - `neondrift:t<trackId>:line:v<n>-<hash>` — optimal line markers for that geometry + physics
-- `neondrift:mute` — sound preference, global
+- `neondrift:mute` — sound preference (everything), global
+- `neondrift:music` — music on/off, global
 
 Wrap every read in try/catch and render correctly when storage is empty.
 
@@ -352,4 +361,5 @@ else references them.
   key. Note the seed uses *local* midnight — switch to UTC for a real leaderboard.
 - **Engine sound.** Deliberately skipped; it's more work than everything else in
   the audio module combined. Detuned sawtooths with a speed-driven lowpass.
+  (Music now exists — see `audio/music.js` — but engine noise still doesn't.)
 - **Track selection / multiple tracks.** `loadTrack(seed)` already supports it.

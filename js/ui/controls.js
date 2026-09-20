@@ -6,6 +6,7 @@ import { line, ensureLine } from "../sim/line.js";
 import { camera } from "../render/camera.js";
 import { start } from "../game/race.js";
 import * as SFX from "../audio/sfx.js";
+import * as Music from "../audio/music.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
@@ -32,6 +33,13 @@ $mute.textContent = "Sound: " + (SFX.isMuted() ? "off" : "on");
 $mute.addEventListener("click", e => {
   e.stopPropagation(); SFX.unlock();
   $mute.textContent = "Sound: " + (SFX.toggleMute() ? "off" : "on");
+});
+
+const $music = $("musictoggle");
+$music.textContent = "Music: " + (Music.isEnabled() ? "on" : "off");
+$music.addEventListener("click", e => {
+  e.stopPropagation(); SFX.unlock();
+  $music.textContent = "Music: " + (Music.toggle() ? "on" : "off");
 });
 
 const $cam = $("camtoggle");
