@@ -3,6 +3,7 @@
 // The UI reads `board` and listens for "board-updated".
 
 import { on, emit } from "../core/events.js";
+import { RIVAL_PARAM } from "../config/params.js";
 import { track } from "../track/track.js";
 import * as api from "./api.js";
 import * as identity from "./identity.js";
@@ -34,13 +35,43 @@ export async function chooseRival(playerId) {
   let g = ghostCache.get(key);
   if (!g) { g = await api.fetchGhost(id, playerId); if (g && !g.error) ghostCache.set(key, g); }
   if (id !== track.id || !board.rival || board.rival.id !== playerId) return;   // changed mind meanwhile
-  if (!g || g.error) { board.rival.status = "failed"; setRival(null); changed(); return; }
+  if (!g || g.error) { board.rival.status = "failed"; setRival(null); challengePending = false; changed(); return; }
   board.rival = { id: playerId, name: g.name, tag: g.tag, time: g.time, status: "ready" };
   setRival({ id: playerId, name: g.name, tag: g.tag, time: g.time, data: g.ghost });
   changed();
+  if (challengePending) { challengePending = false; emit("challenge", { name: g.name, tag: g.tag, time: g.time }); }
 }
 
 const changed = () => emit("board-updated");
+
+// ---------- challenge links ----------
+
+/** The URL that races your posted run on `seed`: the page with only ?seed and ?rival. */
+export function challengeUrl(seed, playerId, base = location.href) {
+  const url = new URL(base);
+  url.search = "";
+  url.searchParams.set("seed", seed);
+  url.searchParams.set("rival", playerId);
+  return url.href;
+}
+
+/** The rival a challenge link names, or null if it's malformed or your own id. */
+export function pickChallenger(param, ownId) {
+  if (!param || !/^[0-9a-f]{64}$/.test(param)) return null;
+  return param === ownId ? null : param;
+}
+
+let urlRival = RIVAL_PARAM;   // consumed by the first track load
+let challengePending = false; // announce the rival as a challenge once it's loaded
+
+function stripRivalParam() {
+  try {
+    const url = new URL(location.href);
+    if (!url.searchParams.has("rival")) return;
+    url.searchParams.delete("rival");
+    history.replaceState(null, "", url);
+  } catch { /* not a real page (tests, file://): nothing to strip */ }
+}
 
 /** Reload the top list and the player's row for the current track. */
 export async function refreshBoard() {
@@ -106,11 +137,18 @@ export async function claimPairingCode(code) {
   return true;
 }
 
-on("track-loaded", () => {
+on("track-loaded", async () => {
   board.top = []; board.me = null; board.pending = null; board.lastSubmit = null; board.rival = null;
   refreshBoard();
-  const remembered = storage.read(rivalKey());
-  if (remembered && api.apiEnabled()) chooseRival(remembered);
+  let chosen = storage.read(rivalKey());
+  if (urlRival) {
+    // a challenge link: its rival wins over the remembered one, and becomes it
+    const pick = pickChallenger(urlRival, await identity.playerId());
+    urlRival = null;
+    stripRivalParam();
+    if (pick) { chosen = pick; challengePending = true; }
+  }
+  if (chosen && api.apiEnabled()) chooseRival(chosen);
 });
 /**
  * Post a run when it beats your posted time, or you have none posted yet.

@@ -11,6 +11,9 @@
 //   race-finish ({ time, prevBest, isPB })
 //   track-loaded
 //   input-mode ("pointer" | "keys")
+//   board-updated       – leaderboard state changed (net/leaderboard.js)
+//   line-updated        – optimal line status changed (sim/line.js)
+//   challenge ({ name, tag, time }) – a challenge link's ghost is loaded and racing
 
 const listeners = new Map();
 

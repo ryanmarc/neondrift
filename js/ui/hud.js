@@ -189,6 +189,9 @@ function showResult({ time, prevBest, isPB }) {
 // ---------- wiring ----------
 
 on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); $overlay.classList.remove("done"); });
+on("challenge", ({ name, tag, time }) => {
+  $result.innerHTML = '<span class="note">' + esc(name) + '<span class="tag">#' + esc(tag) + "</span> challenges you to beat </span>" + fmt(time) + ".";
+});
 on("race-start", () => $overlay.classList.add("gone"));
 on("race-finish", showResult);
 on("input-mode", setInputMode);

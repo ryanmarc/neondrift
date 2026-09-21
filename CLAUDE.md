@@ -27,6 +27,10 @@ has meant exactly this twice.
   screen's day picker (‹ › around the track label) also sets and clears this
   param via `replaceState`, so a past day's URL is shareable.
 - `?seed=random` — a new track every load.
+- `?rival=<player id>` — a challenge link: race that player's posted run on
+  the linked seed. Consumed once on load, stored as the track's remembered
+  rival, then stripped from the URL. Made by "Challenge a friend" in the
+  leaderboard panel, which appears once you have a posted time.
 - `?dev` — show the dev panel (seed loader, guides checkbox) on the start
   screen. Hidden by default; `DEV_FLAG` in `config/params.js`.
 - `?guides` — show the drift guide markers. Turning guides on also computes
@@ -90,6 +94,11 @@ relatively, or inline it as a `data:` URI.
   races it *instead of* your own ghost (drawn in rose, no label — the HUD names them); the
   live delta, the "vs" line and the end-screen comparison follow it. Your own
   best still saves as usual. Remembered per track in `neondrift:t<id>:rival`.
+- **Challenge links.** "Challenge a friend" shares `?seed=…&rival=<your id>`
+  via the system share sheet, else the clipboard, else the URL shown
+  selectable. Opening one sets that rival and shows "NAME#tag challenges you
+  to beat 39.97." above the race button (the `challenge` event). Your own id
+  is ignored. Only your own posted run can be shared — one meaning per link.
 
 ## Architecture
 
@@ -133,7 +142,7 @@ js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden
             music.js    synthesized synthwave loop; update(live, boosting) picks the mix
 js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
             api.js      fetch wrappers for the leaderboard API; every failure resolves to null
-            leaderboard.js `board` state; posts runs that beat your posted time; rename; pairing; emits board-updated
+            leaderboard.js `board` state; posts runs that beat your posted time; rename; pairing; challenge links; emits board-updated, challenge
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
             board.js    the leaderboard panel: top 10, own row, name prompt, pairing links
             controls.js buttons and the R key
@@ -403,6 +412,13 @@ Run it locally: `cd worker && npm install && npm run db:init:local && npm run de
 A game served from localhost talks to it automatically (`API_URL` in
 `config/params.js` picks the local worker by hostname); the local worker uses
 a simulated D1 under `worker/.wrangler/`, never production.
+
+**Testing from a phone on the same wifi:** open `http://<your Mac's LAN
+IP>:8000/index.html` (`ipconfig getifaddr en0`). Private addresses count as
+local too, the game calls the worker at that same address on port 8787, the dev
+script binds wrangler to all interfaces (`--ip 0.0.0.0`), and the dev env sets
+`ALLOW_LAN=1` so the worker grants CORS to any private-network origin. None of
+this applies to production: it lists only the GitHub Pages origin.
 `node test/make-run.mjs <seed>` writes a genuine run to `/tmp/run.json` for
 `curl` tests.
 

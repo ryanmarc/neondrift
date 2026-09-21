@@ -25,11 +25,14 @@ function randomCode() {
 }
 
 // Only origins listed in ALLOWED_ORIGINS get CORS headers. Production lists the
-// GitHub Pages site; `wrangler dev --env dev` swaps in localhost (see wrangler.toml).
+// GitHub Pages site; `wrangler dev --env dev` swaps in localhost and, via
+// ALLOW_LAN, any private-network origin so a phone on the same wifi can test
+// against the local worker (see wrangler.toml). Production never sets ALLOW_LAN.
+const LAN_ORIGIN = /^http:\/\/(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|[^./:]+\.local)(:\d+)?$/;
 function corsHeaders(request, env) {
   const origin = request.headers.get("origin") || "";
   const allowed = (env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
-  const ok = allowed.includes(origin);
+  const ok = allowed.includes(origin) || (env.ALLOW_LAN === "1" && LAN_ORIGIN.test(origin));
   return ok ? {
     "access-control-allow-origin": origin,
     "access-control-allow-methods": "GET, POST, OPTIONS",
