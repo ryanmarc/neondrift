@@ -64,6 +64,10 @@ export const INITIAL_SEED = !SEED_OVERRIDE
   ? TODAY
   : SEED_PARAM === "random" ? "rnd-" + Math.random().toString(36).slice(2, 10) : SEED_PARAM;
 
+// ?rival=<player id> — a challenge link: race that player's posted run on the
+// linked seed. Read once by net/leaderboard.js, which then strips it.
+export const RIVAL_PARAM = QS.get("rival");
+
 // FEATURE FLAG: drift guide markers. Off by default. Flip to true here to bring
 // them back (which also restores the on-screen toggle button), or append ?guides
 // to the page URL to enable them without editing this file.

@@ -4,11 +4,13 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { board, submitPending, dismissPending, setPlayerName, startPairing, clearPairing, claimPairingCode, chooseRival } from "../net/leaderboard.js";
+import { board, submitPending, dismissPending, setPlayerName, startPairing, clearPairing, claimPairingCode, chooseRival, challengeUrl } from "../net/leaderboard.js";
 import * as identity from "../net/identity.js";
+import { track } from "../track/track.js";
 import { fmt } from "./hud.js";
 
 const $board = $("board"), $list = $("boardlist"), $me = $("boardme"), $status = $("boardstatus");
+const $devices = $("devices"), $challenge = $("challenge");
 const $namerow = $("namerow"), $namehead = $("namehead"), $namebox = $("namebox"), $post = $("postname"), $skip = $("skipname");
 const $pairstart = $("pairstart"), $pairclaim = $("pairclaim"), $rename = $("rename"), $pairbox = $("pairbox");
 
@@ -27,6 +29,7 @@ const row = (rank, r, me, racing) =>
 
 function render() {
   $board.classList.toggle("on", board.status !== "off");
+  $devices.classList.toggle("on", board.status !== "off");
   if (board.status === "off") return;
   refreshTag();
 
@@ -49,7 +52,10 @@ function render() {
   if (board.rival && board.rival.status === "failed") status = "couldn't load that ghost — racing your own";
   else if (board.rival && board.rival.status === "ready") status = "racing " + board.rival.name + "#" + board.rival.tag + " · tap again for your own ghost";
   else if (board.status === "ready" && board.top.length) status = "tap a time to race that ghost";
-  $status.textContent = status;
+  if (shareNote) status = shareNote;   // the share confirmation wins while it's showing
+  $status.classList.toggle("flash", !!shareNote);
+  if (shareNote && shareUrl) $status.innerHTML = esc(status) + '<span class="url">' + esc(shareUrl) + "</span>";
+  else $status.textContent = status;
 
   const renaming = $pairbox.dataset.mode === "rename";
   $namerow.classList.toggle("on", !!board.pending || renaming);
@@ -57,6 +63,7 @@ function render() {
   else if (board.pending) { $namehead.textContent = "Post " + fmt(board.pending.time) + " to the leaderboard"; $post.textContent = "Post"; }
 
   $rename.style.display = identity.getName() ? "" : "none";
+  $challenge.style.display = board.status === "ready" && board.me ? "" : "none";   // needs a posted time to point at
   $pairstart.style.display = identity.getSecret() ? "" : "none";
 
   if (board.pairing) {
@@ -76,6 +83,36 @@ $list.addEventListener("click", e => {
   const id = li.dataset.id;
   chooseRival(board.rival && board.rival.id === id ? null : id);
 });
+
+// ---------- challenge a friend ----------
+
+// The link races your posted run on this track. Share sheet where there is
+// one, else the clipboard, else the URL itself, selectable, in the status line.
+// A confirmation flashes and clears itself; the shown-URL fallback stays so it can be copied.
+let shareNote = "", shareUrl = "", noteTimer = 0;
+function note(text, url = "") {
+  shareNote = text; shareUrl = url;
+  clearTimeout(noteTimer);
+  if (text && !url) noteTimer = setTimeout(() => note(""), 4000);
+  render();
+}
+const clearNote = () => { if (shareNote) note(""); };
+
+async function shareChallenge() {
+  if (!board.me) return;
+  const id = await identity.playerId();
+  if (!id) return;
+  const url = challengeUrl(track.seed, id);
+  const text = "Beat my " + fmt(board.me.time) + " on Neon Drift";
+  if (navigator.share) {
+    try { await navigator.share({ title: "Neon Drift", text, url }); note("challenge sent"); }
+    catch { /* cancelled the sheet: say nothing */ }
+    return;
+  }
+  try { await navigator.clipboard.writeText(url); note("link copied — send it to a friend"); }
+  catch { note("copy this link:", url); }
+}
+$challenge.addEventListener("click", e => { e.stopPropagation(); shareChallenge(); });
 
 // ---------- name prompt (also used for renaming) ----------
 
@@ -130,4 +167,5 @@ $pairclaim.addEventListener("click", e => {
 });
 
 on("board-updated", render);
+on("track-loaded", clearNote);
 render();
