@@ -124,7 +124,7 @@ js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden
             music.js    synthesized synthwave loop; update(live, boosting) picks the mix
 js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
             api.js      fetch wrappers for the leaderboard API; every failure resolves to null
-            leaderboard.js `board` state; submits personal bests; rename; pairing; emits board-updated
+            leaderboard.js `board` state; posts runs that beat your posted time; rename; pairing; emits board-updated
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
             board.js    the leaderboard panel: top 10, own row, name prompt, pairing links
             controls.js buttons and the R key
@@ -184,6 +184,10 @@ Conventions:
   audio clock from a 250ms timer — far enough that a background tab's 1Hz
   timer throttling can't starve it; nodes are made per note, not per frame. Kick
   and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
+- **A run is posted when it beats your posted time, not your local ghost.**
+  The two can differ (a best set before naming yourself, or offline). With no
+  board loaded the local personal-best rule applies. The server still only
+  replaces a row with a faster replayed time.
 - **Times are verified by replay, never trusted.** The physics wrapper records
   the step at which the input changed; the worker replays that through the
   same `integrate()`. Anything that changes `dynamics.js` changes what replays
