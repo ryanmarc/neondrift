@@ -112,8 +112,19 @@ on("track-loaded", () => {
   const remembered = storage.read(rivalKey());
   if (remembered && api.apiEnabled()) chooseRival(remembered);
 });
+/**
+ * Post a run when it beats your posted time, or you have none posted yet.
+ * That is independent of your local ghost, which can be faster than your
+ * posted time (a best set before you had a name, or while offline). When the
+ * board hasn't loaded, fall back to the local personal-best rule.
+ */
+export function worthPosting(result) {
+  if (board.status !== "ready") return result.isPB;
+  return board.me == null || result.time < board.me.time;
+}
+
 on("race-finish", (result) => {
-  if (!api.apiEnabled() || !result.isPB) return;
+  if (!api.apiEnabled() || !worthPosting(result)) return;
   if (identity.getName()) submit(result);
   else { board.pending = result; changed(); }
 });
