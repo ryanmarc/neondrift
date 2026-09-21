@@ -3,6 +3,7 @@
 // four characters of that hash are the tag shown after the name.
 
 import * as storage from "../core/storage.js";
+import { sha256Hex } from "../core/sha256.js";
 
 const SECRET_KEY = "neondrift:player";
 const NAME_KEY = "neondrift:name";
@@ -33,8 +34,7 @@ export async function playerId() {
   const s = getSecret();
   if (!s) return null;
   if (cachedId && cachedFor === s) return cachedId;
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  cachedId = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  cachedId = await sha256Hex(s);   // falls back to plain JS where crypto.subtle is missing (plain-http LAN pages)
   cachedFor = s;
   return cachedId;
 }
