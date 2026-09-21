@@ -412,6 +412,13 @@ Run it locally: `cd worker && npm install && npm run db:init:local && npm run de
 A game served from localhost talks to it automatically (`API_URL` in
 `config/params.js` picks the local worker by hostname); the local worker uses
 a simulated D1 under `worker/.wrangler/`, never production.
+
+**Testing from a phone on the same wifi:** open `http://<your Mac's LAN
+IP>:8000/index.html` (`ipconfig getifaddr en0`). Private addresses count as
+local too, the game calls the worker at that same address on port 8787, the dev
+script binds wrangler to all interfaces (`--ip 0.0.0.0`), and the dev env sets
+`ALLOW_LAN=1` so the worker grants CORS to any private-network origin. None of
+this applies to production: it lists only the GitHub Pages origin.
 `node test/make-run.mjs <seed>` writes a genuine run to `/tmp/run.json` for
 `curl` tests.
 

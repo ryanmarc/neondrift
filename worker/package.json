@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --env dev",
+    "dev": "wrangler dev --env dev --ip 0.0.0.0",
     "db:init": "wrangler d1 execute neondrift --remote --file=./schema.sql",
     "db:init:local": "wrangler d1 execute neondrift --env dev --local --file=./schema.sql"
   },
