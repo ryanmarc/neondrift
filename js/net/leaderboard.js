@@ -118,7 +118,7 @@ on("track-loaded", () => {
  * posted time (a best set before you had a name, or while offline). When the
  * board hasn't loaded, fall back to the local personal-best rule.
  */
-function worthPosting(result) {
+export function worthPosting(result) {
   if (board.status !== "ready") return result.isPB;
   return board.me == null || result.time < board.me.time;
 }
