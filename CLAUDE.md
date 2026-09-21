@@ -23,7 +23,9 @@ has meant exactly this twice.
 ## URL params
 
 - `?seed=2026-12-25` — force a specific track (the daily seed is the UTC date).
-  Any string works; it is only ever hashed into the PRNG seed.
+  Any string works; it is only ever hashed into the PRNG seed. The title
+  screen's day picker (‹ › around the track label) also sets and clears this
+  param via `replaceState`, so a past day's URL is shareable.
 - `?seed=random` — a new track every load.
 - `?dev` — show the dev panel (seed loader, guides checkbox) on the start
   screen. Hidden by default; `DEV_FLAG` in `config/params.js`.
@@ -77,6 +79,13 @@ relatively, or inline it as a `data:` URI.
 - **Ghost** is your best run on this exact track, recorded as `[x, y, angle,
   progress]` at 30Hz into `localStorage`. Progress is stored so the live delta
   can compare times at the same point on track rather than the same timestamp.
+- **Day browser.** The arrows around the track label step to earlier days'
+  tracks, back to `FIRST_DAY` (`config/params.js`, the leaderboard's launch
+  day). A past day is a full track: its board loads, its ghosts race, and new
+  times still post — boards never freeze. The label says "yesterday" / "3 days
+  ago"; a non-date seed from the dev panel says "override". The midnight
+  rollover only pulls the *daily* track forward, so browsing yesterday at
+  23:59 UTC doesn't yank you to the new day.
 - **Rival ghost.** Tapping a leaderboard row fetches that run's recording and
   races it *instead of* your own ghost (drawn in rose, no label — the HUD names them); the
   live delta, the "vs" line and the end-screen comparison follow it. Your own
@@ -99,13 +108,13 @@ js/core/    math.js     clamp, lerp, TAU, wrapAngle
             events.js   on(name, fn) / emit(name, payload) — event list at top of file
             storage.js  localStorage that never throws
             dom.js      $(id)
-js/config/  params.js   URL params, TODAY, INITIAL_SEED, GUIDES_FLAG
+js/config/  params.js   URL params, TODAY, FIRST_DAY, date-seed helpers, INITIAL_SEED, GUIDES_FLAG
             tuning.js   T, CAM, GUIDE, LAPS, PHYSICS_DT, GHOST_HZ, T_TICK, T_GO, road size
 js/track/   generator.js  trackFromAmps, buildTrack(rng) — pure
             track.js      `track` {seed, id, samples}, loadTrackGeometry, nearest
             guides.js     `guides` {flag, visible, list}, rebuildGuides
 js/game/    state.js    `car`, `race`, resetRace
-            daily.js    UTC daily seed, time to rollover, and the rollover itself
+            daily.js    the daily rollover, and the day browser (gotoDay, gotoToday, canGoDay)
             dynamics.js integrate(car, inp, dt) — the pure car model; createCar, placeCar
             ghost.js    `ghost` {data, bestTime}, loadGhost, commitRun, clearGhost, ghostAt…
             physics.js  step(dt) — integrate() on the live car + marks, plume, recording, events

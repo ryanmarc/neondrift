@@ -3,7 +3,7 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { todayUtc, DEV_FLAG } from "../config/params.js";
+import { DEV_FLAG } from "../config/params.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { car, race } from "../game/state.js";
@@ -11,7 +11,6 @@ import { ghost } from "../game/ghost.js";
 import { camera } from "../render/camera.js";
 import { loadTrack, start, tick } from "../game/race.js";
 import { setGuidesVisible } from "./controls.js";
-import { setSeedOverride } from "./hud.js";
 import { line, ensureLine } from "../sim/line.js";
 import * as audio from "../audio/context.js";
 import * as music from "../audio/music.js";
@@ -27,7 +26,6 @@ cb.addEventListener("change", () => setGuidesVisible(cb.checked));
 
 function apply(seed) {
   if (!seed) return;
-  setSeedOverride(seed !== todayUtc());
   loadTrack(seed);
   $result.innerHTML = '<span class="note">Loaded track from seed "' + seed + '".</span>';
   $go.textContent = "TAP TO RACE";
