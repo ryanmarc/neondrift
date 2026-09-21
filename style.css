@@ -104,8 +104,18 @@ canvas{display:block;width:100%;height:100%}
   color:var(--paper);
   text-shadow:0 0 24px rgba(47,227,255,.75),0 0 60px rgba(255,47,158,.45);
 }
-#seed{font-size:11px;letter-spacing:.3em;opacity:.45;margin-top:14px}
+#dayrow{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px}
+#seed{font-size:11px;letter-spacing:.3em;opacity:.45;font-variant-numeric:tabular-nums}
 #seed .override{color:var(--rose);opacity:.9;letter-spacing:.16em}
+#seed .ago{color:var(--ice);opacity:.9;letter-spacing:.16em}
+.daybtn{
+  background:none;border:0;color:var(--paper);opacity:.45;cursor:pointer;
+  font-family:inherit;font-size:22px;line-height:1;padding:4px 10px;
+}
+.daybtn:active{opacity:.9;color:var(--ice)}
+.daybtn:disabled{opacity:.12;cursor:default}
+#daytoday{display:none;margin-top:2px}
+#daytoday.on{display:inline-block}
 #next{display:none;font-size:12px;letter-spacing:.04em;margin-top:10px;opacity:.5;font-variant-numeric:tabular-nums}
 #line{display:none;font-size:11px;letter-spacing:.2em;margin-top:8px;color:#49ff9e;opacity:.75;font-variant-numeric:tabular-nums}
 #howto{display:flex;flex-direction:column;align-items:center;gap:9px;max-width:37ch;margin:0}

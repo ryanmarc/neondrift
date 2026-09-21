@@ -10,6 +10,36 @@ export function todayUtc(d = new Date()) {
 }
 export const TODAY = todayUtc();
 
+/** The first day the game had a leaderboard. Browsing back stops here; earlier boards are empty. */
+export const FIRST_DAY = "2026-09-19";
+
+const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** True for a seed that is a real calendar day in the daily-seed format (zero-padded UTC date). */
+export function isDateSeed(seed) {
+  const m = DATE_RE.exec(seed || "");
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return todayUtc(d) === seed;      // rejects Feb 30 and month 13, which Date would silently roll over
+}
+
+/** The date seed `days` whole days after `seed` (negative for earlier). */
+export function shiftDate(seed, days) {
+  const m = DATE_RE.exec(seed);
+  return todayUtc(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + days)));
+}
+
+/** "today", "yesterday", "3 days ago", "tomorrow", "in 4 days"; null when the seed isn't a date. */
+export function describeDay(seed, today = todayUtc()) {
+  if (!isDateSeed(seed)) return null;
+  const toMs = s => { const m = DATE_RE.exec(s); return Date.UTC(+m[1], +m[2] - 1, +m[3]); };
+  const n = Math.round((toMs(seed) - toMs(today)) / 86400000);
+  if (n === 0) return "today";
+  if (n === -1) return "yesterday";
+  if (n === 1) return "tomorrow";
+  return n < 0 ? (-n) + " days ago" : "in " + n + " days";
+}
+
 /** Milliseconds until the next midnight UTC, when the daily track changes. */
 export function msUntilRollover(now = new Date()) {
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);

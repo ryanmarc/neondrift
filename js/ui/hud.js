@@ -6,17 +6,19 @@ import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
 import { clamp } from "../core/math.js";
 import { LAPS, T_TICK, T_GO } from "../config/tuning.js";
-import { SEED_OVERRIDE, todayUtc, describeUntilRollover } from "../config/params.js";
+import { todayUtc, describeUntilRollover, describeDay } from "../config/params.js";
 import { track } from "../track/track.js";
 import { car, race } from "../game/state.js";
 import { ghost, ghostTimeAtProgress, clearGhost, targetTime } from "../game/ghost.js";
 import { line } from "../sim/line.js";
+import { canGoDay, gotoDay, gotoToday } from "../game/daily.js";
 
 const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best");
 const $fill = $("fill"), $chain = $("chain"), $meter = $("meter");
 const $countdown = $("countdown");
 const $overlay = $("overlay"), $result = $("result"), $go = $("go"), $seed = $("seed");
 const $rule = $("rule"), $clear = $("clearghost"), $line = $("line"), $next = $("next");
+const $dayprev = $("dayprev"), $daynext = $("daynext"), $daytoday = $("daytoday");
 
 export const fmt = t => t.toFixed(2);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -78,17 +80,37 @@ export function updateCountdown() {
   }
 }
 
-// ---------- seed label ----------
+// ---------- seed label + day browser ----------
 
-let seedOverridden = SEED_OVERRIDE;
-
-/** Mark the seed label as an override (anything but today's track). */
-export function setSeedOverride(v) { seedOverridden = v; }
-
+// The label says what the loaded track is relative to today: nothing for
+// today's, "yesterday" / "3 days ago" for another day's, "override" for a
+// seed that isn't a date at all (the dev panel's). The arrows step days.
 function refreshSeed() {
-  $seed.innerHTML = "TRACK " + track.seed + " / " + track.id.toUpperCase()
-    + (seedOverridden ? ' <span class="override">override</span>' : "");
+  const today = todayUtc(), ago = describeDay(track.seed, today);
+  let tag = "";
+  if (ago == null) tag = ' <span class="override">override</span>';
+  else if (ago !== "today") tag = ' <span class="ago">' + ago + "</span>";
+  $seed.innerHTML = "TRACK " + track.seed + " / " + track.id.toUpperCase() + tag;
+  $dayprev.disabled = !canGoDay(-1);
+  $daynext.disabled = !canGoDay(1);
+  $daytoday.classList.toggle("on", track.seed !== today);
+  if (ago != null) syncUrl(today);   // only dates: leave ?seed=random / dev seeds alone
 }
+
+// Keep the address bar on the loaded day so a reload or a shared link lands
+// there: ?seed=<date> away from today, no param on today. Best-effort.
+function syncUrl(today) {
+  try {
+    const url = new URL(location.href);
+    if (track.seed === today) url.searchParams.delete("seed");
+    else url.searchParams.set("seed", track.seed);
+    if (url.href !== location.href) history.replaceState(null, "", url);
+  } catch { /* file:// or a sandboxed frame: the label still works */ }
+}
+
+$dayprev.addEventListener("click", e => { e.stopPropagation(); gotoDay(-1); });
+$daynext.addEventListener("click", e => { e.stopPropagation(); gotoDay(1); });
+$daytoday.addEventListener("click", e => { e.stopPropagation(); gotoToday(); });
 
 // ---------- optimal line status ----------
 
