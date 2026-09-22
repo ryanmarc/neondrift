@@ -217,30 +217,6 @@ canvas{display:block;width:100%;height:100%}
 #result .faster{color:var(--ice);font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(47,227,255,.55)}
 #result .slower{color:var(--rose);font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(255,47,158,.5)}
 #result .note{opacity:.55}
-/* DEV PANEL CSS START — delete with the dev panel */
-#devpanel{
-  pointer-events:auto;margin-top:6px;padding:12px 14px;
-  border:1px dashed rgba(232,240,255,.18);border-radius:12px;
-  display:none;flex-direction:column;gap:10px;align-items:stretch;
-  max-width:300px;width:100%;
-}
-#devpanel.on{display:flex}
-#devpanel label{display:flex;align-items:center;gap:8px;font-size:12px;opacity:.6;cursor:pointer}
-#devpanel input[type=checkbox]{accent-color:var(--ice);width:15px;height:15px}
-#devSeedRow{display:flex;gap:6px}
-#devSeed{
-  flex:1;min-width:0;background:rgba(232,240,255,.06);
-  border:1px solid rgba(232,240,255,.18);border-radius:8px;color:var(--paper);
-  font-family:inherit;font-size:12px;padding:8px 10px;
-}
-#devSeed:focus{outline:none;border-color:var(--ice)}
-#devpanel button{
-  background:rgba(232,240,255,.08);border:1px solid rgba(232,240,255,.18);
-  color:var(--paper);border-radius:8px;font-family:inherit;font-size:12px;
-  padding:8px 11px;cursor:pointer;
-}
-#devpanel button:active{background:rgba(47,227,255,.2)}
-/* DEV PANEL CSS END */
 
 @media (max-height:720px){
   #detail{display:none}                  /* keep the race button and the board in reach on phones */

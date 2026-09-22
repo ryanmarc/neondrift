@@ -73,9 +73,6 @@ export const RIVAL_PARAM = QS.get("rival");
 // to the page URL to enable them without editing this file.
 export const GUIDES_FLAG = false || QS.has("guides");
 
-// FEATURE FLAG: the dev panel (seed loader, guides checkbox) on the start
-// screen. Hidden by default; flip to true here or append ?dev to the URL.
-export const DEV_FLAG = false || QS.has("dev");
 
 // Leaderboard API. Served from localhost or a private LAN address (a phone on
 // the same wifi opening http://192.168.x.x:8000) the game talks to the local

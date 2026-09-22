@@ -84,7 +84,7 @@ export function updateCountdown() {
 
 // The label says what the loaded track is relative to today: nothing for
 // today's, "yesterday" / "3 days ago" for another day's, "override" for a
-// seed that isn't a date at all (the dev panel's). The arrows step days.
+// seed that isn't a date at all (?seed=random or a custom string). The arrows step days.
 function refreshSeed() {
   const today = todayUtc(), ago = describeDay(track.seed, today);
   let tag = "";

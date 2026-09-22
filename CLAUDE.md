@@ -31,8 +31,6 @@ has meant exactly this twice.
   the linked seed. Consumed once on load, stored as the track's remembered
   rival, then stripped from the URL. Made by "Challenge a friend" in the
   leaderboard panel, which appears once you have a posted time.
-- `?dev` — show the dev panel (seed loader, guides checkbox) on the start
-  screen. Hidden by default; `DEV_FLAG` in `config/params.js`.
 - `?guides` — show the drift guide markers. Turning guides on also computes
   the optimal line for the track (see below) and switches the markers to it.
 
@@ -87,7 +85,7 @@ relatively, or inline it as a `data:` URI.
   tracks, back to `FIRST_DAY` (`config/params.js`, the leaderboard's launch
   day). A past day is a full track: its board loads, its ghosts race, and new
   times still post — boards never freeze. The label says "yesterday" / "3 days
-  ago"; a non-date seed from the dev panel says "override". The midnight
+  ago"; a non-date seed (`?seed=random` or a custom string) says "override". The midnight
   rollover only pulls the *daily* track forward, so browsing yesterday at
   23:59 UTC doesn't yank you to the new day.
 - **Rival ghost.** Tapping a leaderboard row fetches that run's recording and
@@ -146,7 +144,6 @@ js/net/     identity.js secret + name in storage; playerId() = sha256(secret); t
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
             board.js    the leaderboard panel: top 10, own row, name prompt, pairing links
             controls.js buttons and the R key
-            devpanel.js dev panel; also puts `window.neon` up for console poking
 ```
 
 Conventions:
@@ -167,8 +164,10 @@ Conventions:
   module-level game state, which is what lets the same code run the player's
   car, the optimiser in a worker, and a Node harness. Keep cosmetics (marks,
   plume, recording) in `physics.js`, not in `integrate()`.
-- The dev panel is one import line in `main.js` plus the marked blocks in
-  `index.html` and `style.css`.
+- `main.js` puts `window.neon` up (car, race, track, ghost, guides, camera,
+  line, loadTrack, start, tick, ensureLine) for poking at live state from the
+  browser console. It is the only debug affordance; everything else is a URL
+  param.
 
 ### Boot order
 
@@ -177,7 +176,7 @@ Conventions:
 1. **`loadTrack(seed)`** — seeded PRNG (mulberry32) → sum of sine harmonics →
    closed loop → arc-length resampled to a 12px-spaced centreline; then the
    geometry hash, the ghost for that hash, and the car on the start line.
-   Called again by the dev panel whenever a new seed is entered.
+   Called again by the day browser and when leaving a run.
 2. **`resize()`** — canvas to viewport.
 3. **`armAutoplay()`** — audio context, resumed on the first interaction.
 4. **`run()`** — the `requestAnimationFrame` loop: fixed 120Hz physics via an
@@ -387,15 +386,6 @@ Wrap every read in try/catch and render correctly when storage is empty.
 - **The chain multiplier lives next to the boost bar, not screen centre.** It was
   centred and flashing; it's a boost fill-rate multiplier, so showing it beside
   the bar it affects explains itself without a tutorial.
-
-## Dev panel (temporary)
-
-Hidden unless `?dev` is on the URL (or `DEV_FLAG` is flipped in
-`config/params.js`); the module still loads so `window.neon` is always there.
-It is the `DEV PANEL START/END` block in `index.html`, the
-`DEV PANEL CSS START/END` block in `style.css`, and `js/ui/devpanel.js` plus
-its import line in `js/main.js`. Deleting them is clean — nothing else
-references them.
 
 ## Leaderboard worker (`worker/`)
 
