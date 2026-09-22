@@ -1,6 +1,6 @@
 // A run: stages in sequence, the clock, the picks. This is the only module
 // that drives the race loop for the run mode, and it does so only through
-// setRules(), start(), startStage() and events. No DOM, no audio: the UI
+// setRules(), start() and events. No DOM, no audio: the UI
 // listens.
 
 import { emit } from "../core/events.js";
@@ -11,7 +11,7 @@ import { track, loadTrackGeometry } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { car, race, resetRace } from "../game/state.js";
 import { unloadGhost } from "../game/ghost.js";
-import { loadTrack, start, startStage, setRules } from "../game/race.js";
+import { loadTrack, start, setRules } from "../game/race.js";
 import { camera, resetCamera } from "../render/camera.js";
 import { run } from "./state.js";
 import { buildFrom, canPick, SKIP } from "./mods.js";
@@ -110,8 +110,8 @@ export function pick(id) {
     race.params = run.build.T;
   }
   run.offer = [];
-  startStage();
-  car.mult = run.chain;                // startStage() resets the car too
+  start();                             // every stage gets the 3-2-1, like the daily race
+  car.mult = run.chain;                // start() resets the car too
   emit("stage-start", run.stage);
 }
 

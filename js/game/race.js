@@ -44,21 +44,6 @@ export function start() {
   emit("race-start");
 }
 
-/**
- * Begin a session with no countdown: the car is already on the line and the
- * player has just tapped, so "GO" flashes and physics starts at once. Used by
- * a run for every stage after the first.
- */
-export function startStage() {
-  resetRace(track.samples[0]);
-  acc = 0; last = performance.now();
-  race.countdown = 0; race.goTimer = T_GO;
-  resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
-  race.running = true;
-  emit("countdown", 0);
-  emit("race-start");
-}
-
 function finish() {
   race.running = false; race.finished = true;
   emit("race-finish", commitRun(race.time, race.rec, race.inputs));
