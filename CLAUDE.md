@@ -98,6 +98,32 @@ relatively, or inline it as a `data:` URI.
   to beat 39.97." above the race button (the `challenge` event). Your own id
   is ignored. Only your own posted run can be shared — one meaning per link.
 
+### Run mode
+
+A gauntlet of one-lap tracks, each seeded `<day>#run<n>` — a different
+geometry from the daily track and from every other stage. A clock replaces
+the lap timer: it starts at 20s and can hold up to 30s, draining every step at
+a rate that ramps up stage over stage, and refilled only while sliding on the
+road, scaled by speed and the chain multiplier — so drifting well is what
+keeps you alive, not just finishing laps. Clearing a stage pays a flat +5s.
+Off-track never kills a run directly (it costs the chain and, with some mods,
+seconds); the run ends only when the clock reaches zero. `TIMER` in
+`js/run/timer.js` is every one of these numbers in one place — the ramp,
+refill gain, and the low-clock and Skip amounts aren't reproduced here.
+
+Between stages you pick one of three mods (plus an always-present Skip, worth
+a few seconds and nothing else). A mod is a trade — some gain, some cost —
+folded into a *build*: a copy of `T` plus the run's own knobs (road width,
+timer multipliers), applied by `buildFrom(picks)` in `js/run/mods.js`; that
+file is the catalogue and the source of every percentage. Offers are seeded
+from the day and stage (`offerFor` in `js/run/offer.js`), so everyone racing
+the same day sees the same choices in the same order; a mod already held is
+weighted to come up again, so a build converges rather than staying scattershot.
+
+Score is stages cleared, then progress into the stage that ended it — not
+time. Bests are local only, per day and all-time, in `localStorage`; there is
+no board, no ghost and no optimal line for a stage.
+
 ## Architecture
 
 ### Module layout
@@ -132,6 +158,12 @@ js/sim/     schedule.js input schedules keyed on track progress; createInput, no
             optimizer.js findLine() — the whole pipeline; LINE_VERSION
             worker.js   module worker: seed in, markers out
             line.js     main-thread `line` state, cache, ensureLine()
+js/run/     mods.js     the mod catalogue; buildFrom(picks) folds picks into a build (T copy + run knobs)
+            offer.js    offerFor(day, stage, picks) — seeded, held-weighted, pure
+            timer.js    TIMER constants; tickTimer() runs the clock inside physics steps
+            stages.js   stageSeed, beats (score order), parseBest, storage keys
+            state.js    the mutable `run` object (leaf, so the HUD can read it)
+            run.js      startRun, pick, restart, abandon; the run's rules object; loadStage
 js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
@@ -144,6 +176,8 @@ js/net/     identity.js secret + name in storage; playerId() = sha256(secret); t
 js/ui/      hud.js      per-frame readouts + end screen; subscribes to game events
             board.js    the leaderboard panel: top 10, own row, name prompt, pairing links
             controls.js buttons and the R key
+            runhud.js   per-frame run readouts (stage, clock, time bar)
+            runui.js    the run button's best line, the offer screen, the run-over screen
 ```
 
 Conventions:
@@ -165,9 +199,9 @@ Conventions:
   car, the optimiser in a worker, and a Node harness. Keep cosmetics (marks,
   plume, recording) in `physics.js`, not in `integrate()`.
 - `main.js` puts `window.neon` up (car, race, track, ghost, guides, camera,
-  line, loadTrack, start, tick, ensureLine) for poking at live state from the
-  browser console. It is the only debug affordance; everything else is a URL
-  param.
+  line, loadTrack, start, tick, ensureLine, run, startRun, pick, restartRun,
+  abandon) for poking at live state from the browser console. It is the only
+  debug affordance; everything else is a URL param.
 
 ### Boot order
 
@@ -230,6 +264,26 @@ Conventions:
   without this the HUD slides under the notch and the home indicator.
 - **Capture `prevBest` before overwriting `bestTime`.** The end screen's delta
   needs the old value; overwriting first silently loses it.
+- **`integrate()` takes the physics table as a parameter** (`P`, default `T`).
+  The live step passes `race.params`; a run swaps in its build's copy. The
+  optimiser and the worker never pass it. `resetRace` never touches
+  `race.params`; `setRules(null)` restores `T`.
+- **Road width is `track.halfW`**, reset to `HALF_W` on every geometry load; a
+  run's road mods scale it. The physics, the renderer and the simulator all
+  read it.
+- **The loop runs under a `rules` object** (`laps`, `onStep`, `onFinish`)
+  whose default is the daily race. `race.js` never imports `js/run/`; the run
+  installs its rules and hands back null. Keep it that way: it is the seam a
+  future mode abstraction widens.
+- **The run never calls `loadTrack`** for a stage (no ghost, no board, no
+  `track-loaded`); it calls `loadTrackGeometry` directly and restores the
+  daily track with `loadTrack(day)` on abandon. A run's stages have no ghost
+  either way: `loadStage` calls `unloadGhost()` to clear the daily one without
+  touching storage, and `abandon`'s `loadTrack` brings it back.
+- **Skip is always pickable, even on an empty offer.** `pick()`'s offer check
+  only applies to a mod id; a fully-capped catalogue (every mod held to its
+  max) still leaves Skip standing, so a run can never strand a player with no
+  legal move.
 
 ## Tuning constants
 
@@ -252,6 +306,8 @@ Conventions:
 | `boostAccel` / `boostSpeed` | Thrust and top speed while boosting. |
 | `boostFill` / `boostDrain` / `boostCap` | Boost economy. |
 | `offDrag` | Drag while off-track. |
+| `multRise` / `multFall` / `multCap` | Chain multiplier build rate while sliding, decay rate, ceiling. |
+| `multResetOff` | Leaving the road resets the chain to ×1. A run's Off-road tax mod flips this off. |
 | `zoomRange` / `zoomLag` | How far the view pulls back at speed, and seconds to follow a speed change. Set `zoomRange` to 0 to lock the zoom. |
 
 ### `CAM` — camera feel
@@ -347,6 +403,8 @@ keyboard tablets wrong.
 - `neondrift:name` — the display name
 - `neondrift:mute` — sound effects on/off, global
 - `neondrift:music` — music on/off, global
+- `neondrift:run:<day>:best` — best run for that day, `{ stages, prog, picks }`
+- `neondrift:run:best` — best run ever, the same shape plus `day`
 
 Wrap every read in try/catch and render correctly when storage is empty.
 
@@ -432,3 +490,13 @@ are rejected), validation, and the client identity.
   the audio module combined. Detuned sawtooths with a speed-driven lowpass.
   (Music now exists — see `audio/music.js` — but engine noise still doesn't.)
 - **Track selection / multiple tracks.** `loadTrack(seed)` already supports it.
+- **Run leaderboard.** Picks plus per-stage inputs would replay the same way
+  the daily leaderboard does; nothing about a run's recording stops it.
+- **Route choice.** Offers are a single set of three cards plus Skip; there is
+  no branching path through a stage.
+- **Track ramp for later stages.** Every stage is generated the same way,
+  regardless of how far the run has gone.
+- **Run sounds.** `timer-low` already fires (see `core/events.js`); nothing
+  subscribes to it yet.
+- **Run ghost.** No stage records or replays a run's own line, unlike the
+  daily race's ghost.
