@@ -242,6 +242,37 @@ body.run #runstage,body.run #runbest,body.run #runtimer,body.run #timemeter,body
 #gorun:disabled{opacity:.35;cursor:default;box-shadow:none;pointer-events:none}
 #runbestline{font-size:12px;opacity:.5;margin-top:-10px;letter-spacing:.06em;min-height:1px}
 
+/* the run's screens replace the title sheet's blocks; the audio footer stays */
+body.run #sheet > *:not(#offer):not(#runover):not(#footer){display:none}
+body.run #clearghost{display:none!important}
+#offer,#runover{display:none;width:100%;flex-direction:column;align-items:center;gap:14px;pointer-events:auto}
+#offer.on,#runover.on{display:flex}
+#offerhead,#rohead{font-size:13px;letter-spacing:.3em;opacity:.7;font-variant-numeric:tabular-nums}
+#cards{display:flex;flex-direction:column;gap:10px;width:100%}
+.card{
+  display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;width:100%;
+  background:rgba(232,240,255,.04);border:1px solid rgba(232,240,255,.16);border-radius:14px;
+  padding:12px 14px;color:var(--paper);font-family:inherit;cursor:pointer;
+}
+.card:active{background:rgba(47,227,255,.14);border-color:var(--ice)}
+.card .cname{font-size:16px;font-weight:700;letter-spacing:.04em}
+.card .pips{margin-left:8px;color:var(--amber);font-size:12px;letter-spacing:.1em}
+.card .cgain{font-size:13px;opacity:.85}
+.card .ccost{font-size:13px;color:var(--rose)}
+.card.skip{opacity:.6;border-style:dashed}
+#roscore{font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1}
+#robest{font-size:14px;opacity:.7}
+#robest.new{color:var(--amber);opacity:1;text-shadow:0 0 16px rgba(255,197,61,.6)}
+#romods{font-size:13px;opacity:.7;line-height:1.7;max-width:32ch}
+#runagain{
+  pointer-events:auto;
+  background:transparent;border:1px solid var(--amber);color:var(--amber);
+  font-family:inherit;font-size:14px;letter-spacing:.16em;
+  padding:14px 34px;border-radius:99px;cursor:pointer;
+  box-shadow:0 0 22px rgba(255,197,61,.3),inset 0 0 22px rgba(255,197,61,.09);
+}
+#runagain:active{background:rgba(255,197,61,.18)}
+
 @media (max-height:720px){
   #detail{display:none}                  /* keep the race button and the board in reach on phones */
   #title{font-size:clamp(40px,12vw,64px)}

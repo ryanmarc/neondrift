@@ -19,6 +19,7 @@ import "./ui/hud.js";          // subscribes to game events
 import "./ui/controls.js";     // wires the buttons
 import "./net/leaderboard.js";  // subscribes to track-loaded and race-finish
 import "./ui/board.js";         // the leaderboard panel
+import "./ui/runui.js";        // the run's screens
 
 loadTrack(INITIAL_SEED);
 resize();
