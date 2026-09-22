@@ -10,15 +10,16 @@ import * as Music from "../audio/music.js";
 import { track } from "../track/track.js";
 import { isDateSeed, todayUtc } from "../config/params.js";
 import { run } from "../run/state.js";
-import { startRun, restart as restartRun } from "../run/run.js";
+import { startRun } from "../run/run.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
 // While the optimal line is being computed the race button is disabled (hud.js);
 // the shortcuts honour the same rule so it can't be bypassed from the keyboard.
 const canStart = () => line.status !== "computing";
-// In a run, "restart" means a fresh run; otherwise it restarts the daily race.
-const restart = () => run.active ? restartRun() : start();
+// Restart is the daily race's only. A run has no restart: its screens offer
+// "run again" and "back to the daily race" at the end, and the button is hidden.
+const restart = () => { if (!run.active) start(); };
 // A run belongs to the day on the title screen, so the day browser gives past days' runs too.
 const runDay = () => isDateSeed(track.seed) ? track.seed : todayUtc();
 $("go").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); start(); });
