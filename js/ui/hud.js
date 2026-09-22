@@ -193,7 +193,7 @@ function showResult({ time, prevBest, isPB }) {
 
 // ---------- wiring ----------
 
-on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); $overlay.classList.remove("done"); });
+on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); $overlay.classList.remove("done"); $go.textContent = "RACE THE DAILY"; });
 on("challenge", ({ name, tag, time }) => {
   $result.innerHTML = '<span class="note">' + esc(name) + '<span class="tag">#' + esc(tag) + "</span> challenges you to beat </span>" + fmt(time) + ".";
 });

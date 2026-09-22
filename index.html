@@ -82,10 +82,10 @@
         </div>
         <button type="button" id="skipname" class="link">Not now</button>
       </div>
-      <button id="go">TAP TO RACE</button>
-      <button id="gorun">RUN THE GAUNTLET</button>
-      <div id="runbestline"></div>
-      <div id="board">
+      <section class="mode" id="daily">
+        <div class="modehead">DAILY RACE</div>
+        <button id="go">RACE THE DAILY</button>
+        <div id="board">
         <div id="boardhead">LEADERBOARD</div>
         <ol id="boardlist"></ol>
         <div id="boardme"></div>
@@ -94,7 +94,14 @@
           <button type="button" class="link" id="challenge">Challenge a friend</button>
           <button type="button" class="link" id="rename">Change name</button>
         </div>
-      </div>
+        </div>
+      </section>
+      <section class="mode" id="gauntlet">
+        <div class="modehead">DAILY GAUNTLET</div>
+        <button id="gorun">RUN THE GAUNTLET</button>
+        <p id="runblurb">Chained tracks, a clock only drifting refills, a mod between each. Same run for everyone.</p>
+        <div id="runbestline"></div>
+      </section>
       <div id="devices">
         <div id="devicelinks">
           <button type="button" class="link" id="pairstart">Play on another device</button>
