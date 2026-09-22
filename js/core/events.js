@@ -14,6 +14,12 @@
 //   board-updated       – leaderboard state changed (net/leaderboard.js)
 //   line-updated        – optimal line status changed (sim/line.js)
 //   challenge ({ name, tag, time }) – a challenge link's ghost is loaded and racing
+//   run-start  ({ day })          – a run began (run/run.js)
+//   stage-start (n)               – stage n begins (after the countdown for stage 1, at once for later stages)
+//   stage-clear ({ stage, bonus }) – a stage was finished; bonus seconds added
+//   offer ({ cleared, bonus, mods }) – the offer screen should show these mod ids
+//   run-over ({ score, best, isBest, picks }) – the timer hit zero
+//   timer-low                     – the clock dipped under TIMER.low
 
 const listeners = new Map();
 

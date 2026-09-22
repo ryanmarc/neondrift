@@ -8,6 +8,7 @@ import { todayUtc, isDateSeed, shiftDate, FIRST_DAY } from "../config/params.js"
 import { track } from "../track/track.js";
 import { race } from "./state.js";
 import { loadTrack } from "./race.js";
+import { run } from "../run/state.js";
 
 let daily = false;   // is the loaded track today's (as opposed to a chosen seed)?
 
@@ -27,18 +28,18 @@ export function canGoDay(delta) {
 
 /** Load the track `delta` days from the current one, clamped to [FIRST_DAY, today]. */
 export function gotoDay(delta) {
-  if (race.running || !canGoDay(delta)) return;
+  if (race.running || run.active || !canGoDay(delta)) return;
   loadTrack(shiftDate(currentDay(), delta));
 }
 
 /** Load today's track. */
 export function gotoToday() {
-  if (race.running) return;
+  if (race.running || run.active) return;
   if (track.seed !== todayUtc()) loadTrack(todayUtc());
 }
 
 function check() {
-  if (daily && !race.running && track.seed !== todayUtc()) loadTrack(todayUtc());
+  if (daily && !race.running && !run.active && track.seed !== todayUtc()) loadTrack(todayUtc());
 }
 setInterval(check, 15000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) check(); });

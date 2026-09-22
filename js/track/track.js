@@ -3,6 +3,7 @@
 import { clamp } from "../core/math.js";
 import { mulberry32, hashStr } from "../core/random.js";
 import { buildTrack } from "./generator.js";
+import { HALF_W } from "../config/tuning.js";
 
 /**
  * Live track state. `samples` is the closed centreline: each entry has
@@ -14,6 +15,7 @@ export const track = {
   id: "",        // geometry hash — the localStorage key for ghosts and best times
   samples: [],
   length: 0,
+  halfW: HALF_W,   // road half-width in px; a run's road mods scale it, loadTrackGeometry resets it
 };
 
 /** Rebuild the track from a seed string. */
@@ -23,6 +25,7 @@ export function loadTrackGeometry(seed) {
   track.seed = seed;
   track.samples = built.S;
   track.length = built.length;
+  track.halfW = HALF_W;
   track.id = hashTrack(built.S);
 }
 

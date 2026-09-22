@@ -17,10 +17,13 @@
     <div>
       <div id="clock">0.00</div>
       <div id="lap">Lap 1 of 3</div>
+      <div id="runstage"></div>
+      <div id="runbest"></div>
     </div>
     <div id="rightstack">
       <div id="delta"></div>
       <div id="best"></div>
+      <div id="runtimer"></div>
     </div>
   </div>
 
@@ -28,6 +31,8 @@
     <div id="chainrow"><div id="chain"></div></div>
     <div id="meter"><div id="fill"></div></div>
     <div id="meterlabel">BOOST</div>
+    <div id="timemeter"><div id="timefill"></div></div>
+    <div id="timelabel">TIME</div>
   </div>
 
   <div id="countdown"></div>
@@ -51,6 +56,18 @@
         <div id="line"></div>
         <div id="next"></div>
       </div>
+      <div id="offer">
+        <div id="offerhead"></div>
+        <div id="cards"></div>
+      </div>
+      <div id="runover">
+        <div id="rohead">RUN OVER</div>
+        <div id="roscore"></div>
+        <div id="robest"></div>
+        <div id="romods"></div>
+        <button id="runagain">RUN AGAIN</button>
+        <button type="button" class="link" id="rundaily">back to the daily race</button>
+      </div>
       <div id="howto">
         <p id="rule">Hold <b>either side</b> of the screen to turn.</p>
         <p id="aside">That's the whole game.</p>
@@ -65,8 +82,10 @@
         </div>
         <button type="button" id="skipname" class="link">Not now</button>
       </div>
-      <button id="go">TAP TO RACE</button>
-      <div id="board">
+      <section class="mode" id="daily">
+        <div class="modehead">DAILY RACE</div>
+        <button id="go">RACE THE DAILY</button>
+        <div id="board">
         <div id="boardhead">LEADERBOARD</div>
         <ol id="boardlist"></ol>
         <div id="boardme"></div>
@@ -75,7 +94,14 @@
           <button type="button" class="link" id="challenge">Challenge a friend</button>
           <button type="button" class="link" id="rename">Change name</button>
         </div>
-      </div>
+        </div>
+      </section>
+      <section class="mode" id="gauntlet">
+        <div class="modehead">DAILY GAUNTLET</div>
+        <button id="gorun">RUN THE GAUNTLET</button>
+        <p id="runblurb">Chained tracks, a clock only drifting refills, a mod between each. Same run for everyone.</p>
+        <div id="runbestline"></div>
+      </section>
       <div id="devices">
         <div id="devicelinks">
           <button type="button" class="link" id="pairstart">Play on another device</button>
@@ -90,18 +116,6 @@
         </div>
         <button id="clearghost">Clear saved ghost</button>
       </div>
-
-      <!-- DEV PANEL START — temporary test controls. To remove: delete this block,
-           the #devpanel CSS block, and the DEV PANEL script block at the end. -->
-      <div id="devpanel">
-        <label id="devGuidesRow"><input type="checkbox" id="devGuides"> Show drift guides</label>
-        <div id="devSeedRow">
-          <input type="text" id="devSeed" placeholder="seed" autocomplete="off" spellcheck="false">
-          <button id="devLoad" type="button">Load</button>
-          <button id="devRandom" type="button">Random</button>
-        </div>
-      </div>
-      <!-- DEV PANEL END -->
     </div>
   </div>
 </div>

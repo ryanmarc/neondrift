@@ -1,7 +1,8 @@
 // The live car's fixed-rate step: runs the pure dynamics on the player's car,
 // then does everything that is only for show — tire marks, the exhaust plume,
 // the ghost recording, the "×N LOST" readout — and emits events for audio/HUD.
-// Called at PHYSICS_DT from the race loop.
+// Called at PHYSICS_DT from the race loop. Returns the flags from integrate()
+// so the loop's rules can react.
 
 import { clamp } from "../core/math.js";
 import { emit } from "../core/events.js";
@@ -20,12 +21,15 @@ export function step(dt) {
   if (inp !== race.lastInput) { race.inputs.push(race.steps, inp); race.lastInput = inp; }
   race.steps++;
 
-  const flags = integrate(car, inp, dt);
+  const flags = integrate(car, inp, dt, 45, race.params);
 
   if (flags & BOOST_IGNITED) emit("boost");
 
   if (flags & WENT_OFF) {
-    if (prevMult > 1.4) { race.lostMult = prevMult; race.breakT = 1; emit("chain-break"); }
+    // An off-track step neither builds nor decays the chain on its own — integrate()
+    // only zeroes it when multResetOff is set — so an unchanged mult under a mod
+    // that keeps it (Off-road tax) means the chain survived and there's nothing to cue.
+    if (prevMult > 1.4 && car.mult < prevMult) { race.lostMult = prevMult; race.breakT = 1; emit("chain-break"); }
     race.shake = Math.min(1, speed / 600); race.chainFlash = 0;
     emit("off-track", clamp(speed / T.maxSpeed, 0, 1));
   }
@@ -63,4 +67,6 @@ export function step(dt) {
   }
 
   race.time += dt;
+
+  return flags;
 }

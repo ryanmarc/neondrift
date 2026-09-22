@@ -2,6 +2,7 @@
 // Nothing here has behaviour; physics.js and race.js own the transitions.
 
 import { createCar, placeCar } from "./dynamics.js";
+import { T } from "../config/tuning.js";
 
 /** The player's car. See dynamics.js for the fields. */
 export const car = createCar();
@@ -13,6 +14,7 @@ export const race = {
   time: 0,
   countdown: 0,     // seconds of 3-2-1 remaining; physics is frozen while > 0
   goTimer: 0,       // seconds the "GO" caption has left to fade
+  params: T,        // the live physics table; a run swaps in its build's copy. resetRace leaves it alone
   marks: [],        // tire marks [{x, y, a, l}]
   trail: [],        // exhaust plume points [{x, y, l, hot}], dropped in world space
   trailAcc: 0,

@@ -12,11 +12,13 @@ import { car, race } from "../game/state.js";
 import { ghost, ghostTimeAtProgress, clearGhost, targetTime } from "../game/ghost.js";
 import { line } from "../sim/line.js";
 import { canGoDay, gotoDay, gotoToday } from "../game/daily.js";
+import { run } from "../run/state.js";
+import { updateRunHud } from "./runhud.js";
 
 const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best");
 const $fill = $("fill"), $chain = $("chain"), $meter = $("meter");
 const $countdown = $("countdown");
-const $overlay = $("overlay"), $result = $("result"), $go = $("go"), $seed = $("seed");
+const $overlay = $("overlay"), $result = $("result"), $go = $("go"), $gorun = $("gorun"), $seed = $("seed");
 const $rule = $("rule"), $clear = $("clearghost"), $line = $("line"), $next = $("next");
 const $dayprev = $("dayprev"), $daynext = $("daynext"), $daytoday = $("daytoday");
 
@@ -26,21 +28,23 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 // ---------- per-frame readouts ----------
 
 export function updateHud() {
-  $clock.textContent = fmt(race.time);
-  $lap.textContent = "Lap " + clamp(car.lap, 1, LAPS) + " of " + LAPS;
-  // the fill carries a glow, so at width 0 it still smears; hide it outright when empty
+  if (run.active) updateRunHud();
+  else {
+    $clock.textContent = fmt(race.time);
+    $lap.textContent = "Lap " + clamp(car.lap, 1, LAPS) + " of " + LAPS;
+    if (ghost.rival) $best.innerHTML = "vs " + esc(ghost.rival.name) + '<span class="tag">#' + esc(ghost.rival.tag) + "</span> " + fmt(ghost.rival.time);
+    else $best.textContent = ghost.bestTime != null ? "Best " + fmt(ghost.bestTime) : "";
+    const gt = ghostTimeAtProgress(car.lap - 1 + car.prog);
+    if (gt != null && race.running && race.countdown <= 0) {
+      const d = race.time - gt;
+      $delta.textContent = (d >= 0 ? "+" : "") + d.toFixed(2);
+      $delta.style.color = d < 0 ? "#2fe3ff" : "#ff2f9e";
+    } else $delta.textContent = "";
+  }
+  // the boost bar and the chain are shared by both modes
   $fill.style.width = (car.boost * 100) + "%";
   $fill.style.opacity = car.boost < 0.004 ? "0" : "1";
   $fill.classList.toggle("hot", car.boosting);
-  if (ghost.rival) $best.innerHTML = "vs " + esc(ghost.rival.name) + '<span class="tag">#' + esc(ghost.rival.tag) + "</span> " + fmt(ghost.rival.time);
-  else $best.textContent = ghost.bestTime != null ? "Best " + fmt(ghost.bestTime) : "";
-
-  const gt = ghostTimeAtProgress(car.lap - 1 + car.prog);
-  if (gt != null && race.running && race.countdown <= 0) {
-    const d = race.time - gt;
-    $delta.textContent = (d >= 0 ? "+" : "") + d.toFixed(2);
-    $delta.style.color = d < 0 ? "#2fe3ff" : "#ff2f9e";
-  } else $delta.textContent = "";
 
   if (race.breakT > 0) {
     $chain.textContent = "×" + race.lostMult.toFixed(1) + " LOST";
@@ -84,7 +88,7 @@ export function updateCountdown() {
 
 // The label says what the loaded track is relative to today: nothing for
 // today's, "yesterday" / "3 days ago" for another day's, "override" for a
-// seed that isn't a date at all (the dev panel's). The arrows step days.
+// seed that isn't a date at all (?seed=random or a custom string). The arrows step days.
 function refreshSeed() {
   const today = todayUtc(), ago = describeDay(track.seed, today);
   let tag = "";
@@ -126,6 +130,7 @@ function refreshLine() {
   $line.textContent = text;
   $line.style.display = text ? "block" : "none";
   $go.disabled = line.status === "computing";   // no racing until the line is ready
+  $gorun.disabled = line.status === "computing";
 }
 
 // ---------- daily rollover countdown ----------
@@ -188,7 +193,7 @@ function showResult({ time, prevBest, isPB }) {
 
 // ---------- wiring ----------
 
-on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); $overlay.classList.remove("done"); });
+on("track-loaded", () => { refreshSeed(); syncClear(); refreshNext(); $overlay.classList.remove("done"); $go.textContent = "RACE THE DAILY"; });
 on("challenge", ({ name, tag, time }) => {
   $result.innerHTML = '<span class="note">' + esc(name) + '<span class="tag">#' + esc(tag) + "</span> challenges you to beat </span>" + fmt(time) + ".";
 });

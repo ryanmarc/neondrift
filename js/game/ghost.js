@@ -35,6 +35,11 @@ export function loadGhost(trackId) {
   const i = storage.read(keyInputs); if (i) { try { ghost.inputs = JSON.parse(i); } catch { /* corrupt: ignore */ } }
 }
 
+/** A run's stages have no ghost; the daily one comes back with loadTrack. */
+export function unloadGhost() {
+  ghost.data = null; ghost.bestTime = null; ghost.inputs = null; ghost.rival = null;
+}
+
 /** Forget the saved run for this track. */
 export function clearGhost() {
   ghost.data = null; ghost.bestTime = null; ghost.inputs = null;

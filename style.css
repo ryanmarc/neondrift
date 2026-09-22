@@ -160,11 +160,16 @@ canvas{display:block;width:100%;height:100%}
   padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);
 }
 .toggle:active{background:rgba(47,227,255,.2)}
-#board{
-  display:none;width:100%;pointer-events:auto;text-align:left;font-size:14px;
+/* One card per mode, each with its own start button and its own numbers, so
+   the leaderboard reads as the daily race's and not the gauntlet's. */
+.mode{
+  width:100%;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
   background:rgba(232,240,255,.04);border:1px solid rgba(232,240,255,.12);border-radius:14px;
-  padding:14px 12px 10px;
+  padding:14px 12px 12px;
 }
+.modehead{font-size:11px;letter-spacing:.3em;opacity:.55}
+#board{display:none;width:100%;text-align:left;font-size:14px;margin-top:2px}   /* borderless: it sits inside its mode card */
 #board.on{display:block}
 #boardhead{font-size:11px;letter-spacing:.3em;opacity:.55;text-align:center;margin-bottom:10px}
 #boardlist{list-style:none;margin:0;padding:0}
@@ -217,30 +222,63 @@ canvas{display:block;width:100%;height:100%}
 #result .faster{color:var(--ice);font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(47,227,255,.55)}
 #result .slower{color:var(--rose);font-weight:700;font-variant-numeric:tabular-nums;text-shadow:0 0 16px rgba(255,47,158,.5)}
 #result .note{opacity:.55}
-/* DEV PANEL CSS START — delete with the dev panel */
-#devpanel{
-  pointer-events:auto;margin-top:6px;padding:12px 14px;
-  border:1px dashed rgba(232,240,255,.18);border-radius:12px;
-  display:none;flex-direction:column;gap:10px;align-items:stretch;
-  max-width:300px;width:100%;
+
+/* ---------- run mode ---------- */
+#runstage,#runbest,#runtimer,#timemeter,#timelabel{display:none}
+body.run #clock,body.run #lap,body.run #delta,body.run #best{display:none}
+body.run #runstage,body.run #runbest,body.run #runtimer,body.run #timemeter,body.run #timelabel{display:block}
+body.run #guidetoggle,body.run #restart{display:none}
+#runstage{font-size:34px;font-weight:700;line-height:.95;letter-spacing:-.02em}
+#runbest{font-size:13px;opacity:.65;margin-top:3px;letter-spacing:.06em}
+#runtimer{font-size:34px;font-weight:700;line-height:.95;font-variant-numeric:tabular-nums;color:var(--amber);text-shadow:0 0 18px rgba(255,197,61,.6)}
+#runtimer.low{color:var(--rose);text-shadow:0 0 18px rgba(255,47,158,.8);animation:timerpulse .5s ease-in-out infinite alternate;transform-origin:right top}
+@keyframes timerpulse{from{transform:scale(1)}to{transform:scale(1.08)}}
+#timemeter{position:relative;height:7px;border-radius:99px;background:rgba(232,240,255,.1);overflow:hidden;margin-top:12px}
+#timefill{height:100%;width:0%;background:var(--amber);border-radius:99px;box-shadow:0 0 14px var(--amber)}
+#timefill.low{background:var(--rose);box-shadow:0 0 14px var(--rose)}
+#timelabel{text-align:center;font-size:10px;letter-spacing:.24em;opacity:.4;margin-top:7px}
+#gorun{
+  pointer-events:auto;
+  background:transparent;border:1px solid var(--amber);color:var(--amber);
+  font-family:inherit;font-size:14px;letter-spacing:.16em;
+  padding:14px 34px;border-radius:99px;cursor:pointer;
+  box-shadow:0 0 22px rgba(255,197,61,.3),inset 0 0 22px rgba(255,197,61,.09);
 }
-#devpanel.on{display:flex}
-#devpanel label{display:flex;align-items:center;gap:8px;font-size:12px;opacity:.6;cursor:pointer}
-#devpanel input[type=checkbox]{accent-color:var(--ice);width:15px;height:15px}
-#devSeedRow{display:flex;gap:6px}
-#devSeed{
-  flex:1;min-width:0;background:rgba(232,240,255,.06);
-  border:1px solid rgba(232,240,255,.18);border-radius:8px;color:var(--paper);
-  font-family:inherit;font-size:12px;padding:8px 10px;
+#gorun:active{background:rgba(255,197,61,.18)}
+#gorun:disabled{opacity:.35;cursor:default;box-shadow:none;pointer-events:none}
+#runblurb{margin:0;max-width:30ch;font-size:13px;line-height:1.55;opacity:.6;text-wrap:pretty}
+#runbestline{font-size:12px;opacity:.5;letter-spacing:.06em;min-height:1px}
+
+/* the run's screens replace the title sheet's blocks; the audio footer stays */
+body.run #sheet > *:not(#offer):not(#runover):not(#footer){display:none}
+body.run #clearghost{display:none!important}
+#offer,#runover{display:none;width:100%;flex-direction:column;align-items:center;gap:14px;pointer-events:auto}
+#offer.on,#runover.on{display:flex}
+#offerhead,#rohead{font-size:13px;letter-spacing:.3em;opacity:.7;font-variant-numeric:tabular-nums}
+#cards{display:flex;flex-direction:column;gap:10px;width:100%}
+.card{
+  display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;width:100%;
+  background:rgba(232,240,255,.04);border:1px solid rgba(232,240,255,.16);border-radius:14px;
+  padding:12px 14px;color:var(--paper);font-family:inherit;cursor:pointer;
 }
-#devSeed:focus{outline:none;border-color:var(--ice)}
-#devpanel button{
-  background:rgba(232,240,255,.08);border:1px solid rgba(232,240,255,.18);
-  color:var(--paper);border-radius:8px;font-family:inherit;font-size:12px;
-  padding:8px 11px;cursor:pointer;
+.card:active{background:rgba(47,227,255,.14);border-color:var(--ice)}
+.card .cname{font-size:16px;font-weight:700;letter-spacing:.04em}
+.card .pips{margin-left:8px;color:var(--amber);font-size:12px;letter-spacing:.1em}
+.card .cgain{font-size:13px;opacity:.85}
+.card .ccost{font-size:13px;color:var(--rose)}
+.card.skip{opacity:.6;border-style:dashed}
+#roscore{font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1}
+#robest{font-size:14px;opacity:.7}
+#robest.new{color:var(--amber);opacity:1;text-shadow:0 0 16px rgba(255,197,61,.6)}
+#romods{font-size:13px;opacity:.7;line-height:1.7;max-width:32ch}
+#runagain{
+  pointer-events:auto;
+  background:transparent;border:1px solid var(--amber);color:var(--amber);
+  font-family:inherit;font-size:14px;letter-spacing:.16em;
+  padding:14px 34px;border-radius:99px;cursor:pointer;
+  box-shadow:0 0 22px rgba(255,197,61,.3),inset 0 0 22px rgba(255,197,61,.09);
 }
-#devpanel button:active{background:rgba(47,227,255,.2)}
-/* DEV PANEL CSS END */
+#runagain:active{background:rgba(255,197,61,.18)}
 
 @media (max-height:720px){
   #detail{display:none}                  /* keep the race button and the board in reach on phones */

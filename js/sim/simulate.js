@@ -3,7 +3,7 @@
 // where every press and release happened. Also provides the road-following
 // controller that seeds the optimiser.
 
-import { LAPS, PHYSICS_DT, HALF_W } from "../config/tuning.js";
+import { LAPS, PHYSICS_DT } from "../config/tuning.js";
 import { track } from "../track/track.js";
 import { createCar, placeCar, integrate } from "../game/dynamics.js";
 import { createInput, normalize } from "./schedule.js";
@@ -71,7 +71,7 @@ export function bootstrap({ decide = 6, hold = 12, horizon = 60, steerCost = 0.0
     for (let k = 0; k < horizon; k++) {
       integrate(probe, k < holdFor ? u : 0, PHYSICS_DT, WINDOW);
       const s = S[probe.idx], dx = probe.x - s.x, dy = probe.y - s.y;
-      c += Math.pow((dx * dx + dy * dy) / (HALF_W * HALF_W), edge / 2) + (probe.off ? 100 : 0);
+      c += Math.pow((dx * dx + dy * dy) / (track.halfW * track.halfW), edge / 2) + (probe.off ? 100 : 0);
     }
     return c - speed * (probe.lap - 1 + probe.prog - P0);
   };
