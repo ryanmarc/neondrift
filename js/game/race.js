@@ -4,7 +4,7 @@
 
 import { clamp } from "../core/math.js";
 import { emit } from "../core/events.js";
-import { LAPS, PHYSICS_DT, T_TICK, T_GO } from "../config/tuning.js";
+import { LAPS, PHYSICS_DT, T_TICK, T_GO, T } from "../config/tuning.js";
 import { track, loadTrackGeometry } from "../track/track.js";
 import { rebuildGuides } from "../track/guides.js";
 import { car, race, resetRace } from "./state.js";
@@ -44,9 +44,43 @@ export function start() {
   emit("race-start");
 }
 
+/**
+ * Begin a session with no countdown: the car is already on the line and the
+ * player has just tapped, so "GO" flashes and physics starts at once. Used by
+ * a run for every stage after the first.
+ */
+export function startStage() {
+  resetRace(track.samples[0]);
+  acc = 0; last = performance.now();
+  race.countdown = 0; race.goTimer = T_GO;
+  resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
+  race.running = true;
+  emit("countdown", 0);
+  emit("race-start");
+}
+
 function finish() {
   race.running = false; race.finished = true;
   emit("race-finish", commitRun(race.time, race.rec, race.inputs));
+}
+
+/**
+ * What a session is: how many laps end it, a hook after every physics step
+ * (return true to end it early), and what to do when it ends. The defaults are
+ * the daily race. A run mode supplies its own via setRules() and hands back
+ * null when it is done.
+ */
+export const defaultRules = {
+  laps: LAPS,
+  onStep(flags, dt) { return false; },
+  onFinish(reason) { finish(); },
+};
+let rules = defaultRules;
+
+/** Install a rules object, or null to restore the daily race (and the stock physics). */
+export function setRules(r) {
+  rules = r || defaultRules;
+  if (!r) race.params = T;
 }
 
 /**
@@ -69,8 +103,9 @@ export function tick(now) {
     } else {
       acc += dt;
       while (acc >= PHYSICS_DT) {
-        step(PHYSICS_DT); acc -= PHYSICS_DT;
-        if (car.lap > LAPS) { finish(); break; }
+        const flags = step(PHYSICS_DT); acc -= PHYSICS_DT;
+        if (rules.onStep(flags, PHYSICS_DT)) { rules.onFinish("stopped"); break; }
+        if (car.lap > rules.laps) { rules.onFinish("laps"); break; }
       }
     }
   }
