@@ -103,8 +103,10 @@ relatively, or inline it as a `data:` URI.
 A gauntlet of one-lap tracks, each seeded `<day>#run<n>` — a different
 geometry from the daily track and from every other stage. A clock replaces
 the lap timer: it starts at 20s and can hold up to 30s, draining every step at
-a rate that ramps up stage over stage toward a ceiling it never reaches
-(`drainMax`, so a late run is hard but a ×3 chain always breaks even), and
+a rate that ramps steeply over the first stages, knees at about 1.6× by stage
+8, then creeps upward without bound (`drainMax`, `rampK`, `creep`, `knee` in
+`TIMER`). The knee is what keeps one wall survivable; the creep is what makes
+every run end — a capped drain let a chain-keeping build refill forever. It is
 refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
 keeps you alive, not just finishing laps. Clearing a stage pays `TIMER.bonus`

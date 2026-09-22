@@ -58,8 +58,8 @@ export const MODS = [
     gain: "Clearing a stage pays 60% more.", cost: "The clock drains 10% faster.",
     apply(b) { b.bonus *= 1.60; b.drain *= 1.10; } },
   { id: "roller", name: "High roller", max: 1,
-    gain: "Slides refill the clock at double rate.", cost: "Only from a ×2 chain up. Below that, nothing.",
-    apply(b) { b.refill *= 2; b.refillFloorMult = 2; } },
+    gain: "Slides refill the clock 60% faster.", cost: "Only from a ×2 chain up. Below that, nothing.",
+    apply(b) { b.refill *= 1.6; b.refillFloorMult = 2; } },
   // ---- the road (takes effect on the next stage)
   { id: "wide", name: "Wide road", max: 2,
     gain: "The road is 12% wider.", cost: "The clock drains 8% faster.",

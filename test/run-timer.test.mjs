@@ -16,9 +16,10 @@ test("drains one second per second on stage 1, ramped on later stages", () => {
   const run = fresh();
   second(run, 0, carAt(1));
   close(run.timer, TIMER.start - 1, 1e-6);
-  close(drainRate(10, buildFrom([])), 1 + (TIMER.drainMax - 1) * (1 - Math.pow(TIMER.rampK, 9)));
-  assert.ok(drainRate(200, buildFrom([])) < TIMER.drainMax, "the drain never reaches its ceiling");
-  assert.ok(drainRate(9, buildFrom([])) > drainRate(8, buildFrom([])), "but it rises every stage");
+  close(drainRate(10, buildFrom([])), 1 + (TIMER.drainMax - 1) * (1 - Math.pow(TIMER.rampK, 9)) + TIMER.creep * (10 - TIMER.knee));
+  assert.ok(drainRate(TIMER.knee, buildFrom([])) < TIMER.drainMax, "a knee, not a cliff, in the early stages");
+  assert.ok(drainRate(9, buildFrom([])) > drainRate(8, buildFrom([])), "it rises every stage");
+  assert.ok(drainRate(60, buildFrom([])) > 5, "and without bound, so every build ends");
   close(drainRate(1, buildFrom(["turbo"])), 1.08);
 });
 
@@ -31,7 +32,7 @@ test("refills only while SLIDING and only above the refill floor", () => {
   close(r.timer, TIMER.start - 1, 1e-6);      // ×1 is below the floor: drain only
   const r2 = fresh({ build: buildFrom(["roller"]) });
   second(r2, SLIDING, carAt(2));
-  assert.ok(r2.timer > TIMER.start, "×2 with roller refills at double rate");
+  assert.ok(r2.timer > TIMER.start, "×2 with roller refills faster");
 });
 
 test("a ×4 chain out-earns stage-1 drain; a ×1 slide roughly breaks even", () => {

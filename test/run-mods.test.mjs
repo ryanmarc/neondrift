@@ -46,7 +46,7 @@ test("timer, road and rule mods land on the run knobs", () => {
   close(buildFrom(["turbo"]).drain, 1.08);
   close(buildFrom(["slow"]).cap, 1 - 4 / 30);
   close(buildFrom(["wide", "tight"]).halfW, 1.12 * 0.88);
-  const r = buildFrom(["roller"]); assert.equal(r.refill, 2); assert.equal(r.refillFloorMult, 2);
+  const r = buildFrom(["roller"]); close(r.refill, 1.6); assert.equal(r.refillFloorMult, 2);
   const o = buildFrom(["offtax"]); assert.equal(o.T.multOffKeep, 1); assert.equal(o.offTax, 2);
   const h = buildFrom(["hot"]); close(h.T.multRise, T.multRise * 1.5); close(h.T.multFall, T.multFall * 2.5);
 });

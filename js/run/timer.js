@@ -9,9 +9,11 @@ export const TIMER = {
   start: 20,      // seconds on the clock at stage 1
   cap: 30,        // the most it can hold (× build.cap)
   drain: 1.0,     // seconds lost per second at stage 1 (× build.drain)
-  drainMax: 1.75, // the drain approaches this multiple of `drain` and never reaches it —
-  rampK: 0.85,    // closing this much less of the gap each stage (stage 5 ≈ 1.36, stage 9 ≈ 1.55, stage 15 ≈ 1.67).
-                  // A ceiling keeps a late run hard but never impossible: a ×3 chain still breaks even.
+  drainMax: 1.75, // the early ramp approaches this multiple of `drain`, closing 15% of the gap
+  rampK: 0.85,    // each stage (stage 5 ≈ 1.36, stage 9 ≈ 1.55): steep at first, then a knee —
+  creep: 0.08,    // then it keeps climbing by this much per stage past `knee`, without bound.
+  knee: 8,        // The knee is what keeps a single wall survivable; the creep is what makes
+                  // every run end. A capped drain let a chain-keeping build refill forever.
   refill: 1.8,    // slide refill gain — see tickTimer for the formula
   bonus: 5,       // seconds for clearing a stage (× build.bonus)
   low: 5,         // "timer-low" fires crossing down through this; re-arms above low + 2
@@ -20,7 +22,8 @@ export const TIMER = {
 
 export function drainRate(stage, build) {
   const ramp = 1 + (TIMER.drainMax - 1) * (1 - Math.pow(TIMER.rampK, stage - 1));
-  return TIMER.drain * ramp * build.drain;
+  const creep = TIMER.creep * Math.max(0, stage - TIMER.knee);
+  return TIMER.drain * (ramp + creep) * build.drain;
 }
 
 export function capFor(build) {
