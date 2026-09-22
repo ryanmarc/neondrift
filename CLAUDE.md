@@ -106,7 +106,12 @@ the lap timer: it starts at 20s and can hold up to 30s, draining every step at
 a rate that ramps up stage over stage, and refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
 keeps you alive, not just finishing laps. Clearing a stage pays `TIMER.bonus`
-seconds, scaled by the build's bonus multiplier.
+seconds, scaled by the build's bonus multiplier. **The chain carries across
+stages**: a run is one continuous drive, so the multiplier you cross the line
+with is the one the next stage starts on (`run.chain`). It has to — the chain
+builds at 0.30/s and a one-lap stage has a second or so of sliding per corner,
+so even the ideal line peaks near ×1.9 inside a single stage; only a chain
+built over several stages can out-earn the ramped drain.
 Off-track never kills a run directly (it costs the chain and, with some mods,
 seconds); the run ends only when the clock reaches zero. `TIMER` in
 `js/run/timer.js` is every one of these numbers in one place — the ramp,

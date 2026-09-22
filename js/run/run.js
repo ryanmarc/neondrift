@@ -35,6 +35,7 @@ function loadStage(n) {
   track.halfW = HALF_W * run.build.halfW;
   unloadGhost();
   resetRace(track.samples[0]);
+  car.mult = run.chain;                // the chain carries over; the reset put it back to ×1
   race.params = run.build.T;
   resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
   run.stage = n;
@@ -53,6 +54,7 @@ const runRules = {
     const cur = run.stages[run.stages.length - 1];
     cur.inputs = race.inputs.slice(); cur.time = race.time;
     cur.prog = reason === "laps" ? 1 : car.prog;
+    run.chain = car.mult;                // whatever you crossed the line with is where the next stage starts
     if (reason === "laps") stageClear(); else runOver();
   },
 };
@@ -84,7 +86,7 @@ function runOver() {
 export function startRun(day = todayUtc()) {
   if (run.active) leave();
   run.active = true; run.over = false; run.day = day;
-  run.stage = 0; run.timer = TIMER.start; run.lowArmed = true;
+  run.stage = 0; run.timer = TIMER.start; run.lowArmed = true; run.chain = 1;
   run.picks = []; run.build = buildFrom([]); run.stages = []; run.offer = [];
   loadBests(day);
   savedGuides = guides.visible; guides.visible = false;
@@ -109,6 +111,7 @@ export function pick(id) {
   }
   run.offer = [];
   startStage();
+  car.mult = run.chain;                // startStage() resets the car too
   emit("stage-start", run.stage);
 }
 
