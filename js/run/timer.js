@@ -27,8 +27,8 @@ export function capFor(build) {
 /**
  * One physics step of the clock. Mutates run.timer and run.lowArmed.
  * The refill has the boost fill's shape: more angle, more speed, more chain →
- * more time. Returns { over, low }: over when the clock just hit zero, low on
- * the step it first dips under TIMER.low.
+ * more time. Returns { over, low }: over once the clock is at zero (the caller
+ * stops the session on the first), low on the step it first dips under TIMER.low.
  */
 export function tickTimer(run, flags, car, dt) {
   const b = run.build;

@@ -105,7 +105,8 @@ geometry from the daily track and from every other stage. A clock replaces
 the lap timer: it starts at 20s and can hold up to 30s, draining every step at
 a rate that ramps up stage over stage, and refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
-keeps you alive, not just finishing laps. Clearing a stage pays a flat +5s.
+keeps you alive, not just finishing laps. Clearing a stage pays `TIMER.bonus`
+seconds, scaled by the build's bonus multiplier.
 Off-track never kills a run directly (it costs the chain and, with some mods,
 seconds); the run ends only when the clock reaches zero. `TIMER` in
 `js/run/timer.js` is every one of these numbers in one place — the ramp,
@@ -129,7 +130,7 @@ no board, no ghost and no optimal line for a stage.
 ### Module layout
 
 ES modules, loaded from `<script type="module" src="js/main.js">`. Dependencies
-point one way — `ui` → `game` → `track`/`render`/`audio` → `config`/`core` —
+point one way — `ui` → `run` → `game` → `track`/`render`/`audio` → `config`/`core` —
 and the game layer never imports the DOM or audio code: it emits events on a
 tiny bus (`core/events.js`) and `ui/hud.js` and `audio/sfx.js` subscribe.
 That is what keeps the graph acyclic; keep it that way when adding features.

@@ -26,7 +26,10 @@ export function step(dt) {
   if (flags & BOOST_IGNITED) emit("boost");
 
   if (flags & WENT_OFF) {
-    if (prevMult > 1.4) { race.lostMult = prevMult; race.breakT = 1; emit("chain-break"); }
+    // An off-track step neither builds nor decays the chain on its own — integrate()
+    // only zeroes it when multResetOff is set — so an unchanged mult under a mod
+    // that keeps it (Off-road tax) means the chain survived and there's nothing to cue.
+    if (prevMult > 1.4 && car.mult < prevMult) { race.lostMult = prevMult; race.breakT = 1; emit("chain-break"); }
     race.shake = Math.min(1, speed / 600); race.chainFlash = 0;
     emit("off-track", clamp(speed / T.maxSpeed, 0, 1));
   }

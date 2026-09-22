@@ -15,6 +15,7 @@ const { car, race, resetRace } = await import(new URL("game/state.js", root));
 const { step } = await import(new URL("game/physics.js", root));
 const { createCar, placeCar, integrate } = await import(new URL("game/dynamics.js", root));
 const { T, HALF_W, PHYSICS_DT } = await import(new URL("config/tuning.js", root));
+const { on } = await import(new URL("core/events.js", root));
 
 const speedOf = c => Math.hypot(c.vx, c.vy);
 
@@ -88,5 +89,39 @@ test("step() uses race.params and returns the flags", () => {
   assert.equal(speedOf(car), 0, "no thrust means no motion");
   resetRace(track.samples[0]);
   assert.notEqual(race.params, T, "resetRace must not touch race.params");
+  race.params = T;
+});
+
+test("chain-break only fires when the chain was actually lost", () => {
+  loadTrackGeometry("params-test");
+  const s = track.samples[0];
+
+  // Off-road tax: multResetOff false, so an excursion drains the timer instead
+  // of resetting the chain. The cue must stay silent.
+  resetRace(s);
+  car.mult = 3;
+  car.x = s.x + s.nx * (HALF_W + 40);
+  car.y = s.y + s.ny * (HALF_W + 40);
+  race.params = { ...T, multResetOff: false };
+  let fired = false;
+  const off = on("chain-break", () => { fired = true; });
+  step(PHYSICS_DT);
+  off();
+  assert.equal(fired, false, "a mod that keeps the chain through an excursion must not cue a loss");
+  assert.equal(car.mult, 3);
+
+  // Default table: the same excursion really does reset the chain, so the cue must fire.
+  resetRace(s);
+  car.mult = 3;
+  car.x = s.x + s.nx * (HALF_W + 40);
+  car.y = s.y + s.ny * (HALF_W + 40);
+  race.params = T;
+  fired = false;
+  const off2 = on("chain-break", () => { fired = true; });
+  step(PHYSICS_DT);
+  off2();
+  assert.equal(fired, true, "the default table must still cue a real loss");
+  assert.equal(race.lostMult, 3);
+
   race.params = T;
 });

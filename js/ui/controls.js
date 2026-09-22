@@ -30,8 +30,11 @@ const $guides = $("guidetoggle");
 if (!guides.flag) $guides.style.display = "none";
 $guides.addEventListener("click", e => { e.stopPropagation(); setGuidesVisible(!guides.visible); });
 
-/** Toggle the drift guides and keep the button label in sync. */
+/** Toggle the drift guides and keep the button label in sync. Inert mid-run:
+ * the daily track's optimal line doesn't match a run stage's shorter sample
+ * array, and the renderer throws indexing into it. */
 export function setGuidesVisible(v) {
+  if (run.active) return;
   guides.visible = v;
   $guides.textContent = "Guides: " + (v ? "on" : "off");
   if (v) ensureLine();

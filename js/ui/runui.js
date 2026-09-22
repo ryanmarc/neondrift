@@ -8,6 +8,7 @@ import { isDateSeed, todayUtc } from "../config/params.js";
 import { track } from "../track/track.js";
 import { run } from "../run/state.js";
 import { pick, abandon, startRun, loadBests } from "../run/run.js";
+import { beats } from "../run/stages.js";
 import { byId, SKIP, held } from "../run/mods.js";
 import * as SFX from "../audio/sfx.js";
 
@@ -30,7 +31,7 @@ function card(id) {
 }
 
 function showOffer({ cleared, bonus, mods }) {
-  $offerhead.textContent = "STAGE " + cleared + " CLEAR · +" + bonus.toFixed(0) + "s";
+  $offerhead.textContent = "STAGE " + cleared + " CLEAR · +" + (Number.isInteger(bonus) ? bonus : bonus.toFixed(1)) + "s";
   $cards.innerHTML = mods.map(card).join("") + card(SKIP.id);
   $runover.classList.remove("on");
   $offer.classList.add("on");
@@ -69,7 +70,11 @@ $("rundaily").addEventListener("click", e => { e.stopPropagation(); abandon(); }
 function syncTitle() {
   if (run.active) return;
   loadBests(isDateSeed(track.seed) ? track.seed : todayUtc());
-  $runbestline.textContent = run.bestDay ? "Best: stage " + run.bestDay.stages : "";
+  let text = run.bestDay ? "Best: stage " + run.bestDay.stages : "";
+  if (run.bestAll && beats(run.bestAll, run.bestDay)) {
+    text += text ? " · best ever: stage " + run.bestAll.stages : "Best ever: stage " + run.bestAll.stages;
+  }
+  $runbestline.textContent = text;
 }
 
 on("track-loaded", () => {

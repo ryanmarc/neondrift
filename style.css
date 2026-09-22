@@ -222,6 +222,7 @@ canvas{display:block;width:100%;height:100%}
 #runstage,#runbest,#runtimer,#timemeter,#timelabel{display:none}
 body.run #clock,body.run #lap,body.run #delta,body.run #best{display:none}
 body.run #runstage,body.run #runbest,body.run #runtimer,body.run #timemeter,body.run #timelabel{display:block}
+body.run #guidetoggle{display:none}
 #runstage{font-size:34px;font-weight:700;line-height:.95;letter-spacing:-.02em}
 #runbest{font-size:13px;opacity:.65;margin-top:3px;letter-spacing:.06em}
 #runtimer{font-size:34px;font-weight:700;line-height:.95;font-variant-numeric:tabular-nums;color:var(--amber);text-shadow:0 0 18px rgba(255,197,61,.6)}
