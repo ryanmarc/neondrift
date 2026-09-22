@@ -3,7 +3,7 @@
 
 import { $ } from "../core/dom.js";
 import { clamp, lerp, wrapAngle } from "../core/math.js";
-import { ROAD_W, HALF_W, LAPS } from "../config/tuning.js";
+import { LAPS } from "../config/tuning.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { line } from "../sim/line.js";
@@ -118,7 +118,7 @@ function drawGrid(bx0, bx1, by0, by1) {
 
 function drawRoad(runs) {
   cx.lineCap = "round"; cx.lineJoin = "round";
-  cx.strokeStyle = COLOR.road; cx.lineWidth = ROAD_W;
+  cx.strokeStyle = COLOR.road; cx.lineWidth = track.halfW * 2;
   for (const run of runs) {
     if (run.length < 2) continue;
     cx.beginPath(); cx.moveTo(run[0].x, run[0].y);
@@ -148,7 +148,7 @@ function drawEdges(runs) {
       if (run.length < 2) continue;
       cx.beginPath();
       for (let i = 0; i < run.length; i++) {
-        const s = run[i], X = s.x + s.nx * HALF_W * sign, Y = s.y + s.ny * HALF_W * sign;
+        const s = run[i], X = s.x + s.nx * track.halfW * sign, Y = s.y + s.ny * track.halfW * sign;
         i ? cx.lineTo(X, Y) : cx.moveTo(X, Y);
       }
       cx.stroke();
@@ -162,8 +162,8 @@ function drawGuide(s, col, dashed) {
   cx.strokeStyle = col; cx.lineWidth = 4; cx.shadowColor = col; cx.shadowBlur = 14;
   if (dashed) cx.setLineDash([15, 11]);
   cx.beginPath();
-  cx.moveTo(s.x + s.nx * HALF_W, s.y + s.ny * HALF_W);
-  cx.lineTo(s.x - s.nx * HALF_W, s.y - s.ny * HALF_W);
+  cx.moveTo(s.x + s.nx * track.halfW, s.y + s.ny * track.halfW);
+  cx.lineTo(s.x - s.nx * track.halfW, s.y - s.ny * track.halfW);
   cx.stroke();
   cx.restore();
 }
@@ -186,7 +186,7 @@ function drawLineMarkers(S, inView) {
 
 function drawStartLine(s0) {
   cx.save(); cx.translate(s0.x, s0.y); cx.rotate(Math.atan2(s0.ty, s0.tx));
-  cx.fillStyle = COLOR.startLine; cx.fillRect(-5, -HALF_W, 10, ROAD_W);
+  cx.fillStyle = COLOR.startLine; cx.fillRect(-5, -track.halfW, 10, track.halfW * 2);
   cx.restore();
 }
 

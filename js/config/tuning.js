@@ -28,6 +28,8 @@ export const T = {
   slipLagOut: 0.45,             // seconds to gather it back up as the car straightens
   boostCap: 1.0, boostDrain: 0.46, boostFill: 0.60,
   offDrag: 2.2,
+  multRise: 0.30, multFall: 0.10, multCap: 4,   // chain multiplier: build rate (/s while sliding), decay rate, ceiling
+  multResetOff: true,                            // leaving the road resets the chain to ×1
   zoomRange: 0.045,             // how far the view pulls back at full speed
   zoomLag: 0.60,                // seconds for the zoom to follow a speed change
 };

@@ -1,7 +1,8 @@
 // The live car's fixed-rate step: runs the pure dynamics on the player's car,
 // then does everything that is only for show — tire marks, the exhaust plume,
 // the ghost recording, the "×N LOST" readout — and emits events for audio/HUD.
-// Called at PHYSICS_DT from the race loop.
+// Called at PHYSICS_DT from the race loop. Returns the flags from integrate()
+// so the loop's rules can react.
 
 import { clamp } from "../core/math.js";
 import { emit } from "../core/events.js";
@@ -20,7 +21,7 @@ export function step(dt) {
   if (inp !== race.lastInput) { race.inputs.push(race.steps, inp); race.lastInput = inp; }
   race.steps++;
 
-  const flags = integrate(car, inp, dt);
+  const flags = integrate(car, inp, dt, 45, race.params);
 
   if (flags & BOOST_IGNITED) emit("boost");
 
@@ -63,4 +64,6 @@ export function step(dt) {
   }
 
   race.time += dt;
+
+  return flags;
 }

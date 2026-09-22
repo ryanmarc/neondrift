@@ -4,7 +4,7 @@
 // a Web Worker searching for the optimal line, and a Node harness.
 
 import { clamp, lerp } from "../core/math.js";
-import { T, HALF_W } from "../config/tuning.js";
+import { T } from "../config/tuning.js";
 import { track, nearest } from "../track/track.js";
 
 /** Flag bits returned by integrate(). */
@@ -37,13 +37,14 @@ export function placeCar(car, s) {
  * Advance `car` by dt seconds with steering input inp (-1, 0, 1).
  * Uses the currently loaded track. Returns a bitmask of BOOST_IGNITED,
  * WENT_OFF and SLIDING. `window` is passed through to nearest(); see there.
+ * `P` is the physics table, `T` unless a run mode supplies its own.
  */
-export function integrate(car, inp, dt, window = 45) {
+export function integrate(car, inp, dt, window = 45, P = T) {
   let flags = 0;
   car.px = car.x; car.py = car.y; car.pa = car.a;   // previous state, for render interpolation
 
-  if (inp !== 0) car.charge = Math.min(1, car.charge + dt / T.chargeUp);
-  else car.charge = Math.max(0, car.charge - dt / T.chargeDown);
+  if (inp !== 0) car.charge = Math.min(1, car.charge + dt / P.chargeUp);
+  else car.charge = Math.max(0, car.charge - dt / P.chargeDown);
 
   const speed = Math.hypot(car.vx, car.vy);
   const turnScale = Math.min(1, speed / 175);
@@ -56,15 +57,15 @@ export function integrate(car, inp, dt, window = 45) {
     // Real tires don't restore harder the more sideways you get — the aligning force
     // peaks near the grip limit, then fades. That fade is what lets a drift hold.
     const ab = Math.abs(beta0), sn = Math.sin(ab);
-    let shape = Math.max(sn * Math.exp(-ab / T.alignFall), sn * T.alignFloor) * Math.sign(beta0);
+    let shape = Math.max(sn * Math.exp(-ab / P.alignFall), sn * P.alignFloor) * Math.sign(beta0);
     shape *= 1 + Math.max(0, ab - 1.25) * 4;   // only gather it up once you're truly spinning
     // Second-order yaw: the aligning force is a TORQUE on a body with inertia, damped
     // separately — so the nose can swing slightly past straight and come back, which a
     // first-order system mathematically cannot do. om is derived from align and zeta so
     // the settled drift angle is unchanged; zeta alone controls the settling character.
     const w = (inp === 0 ? 0.90 : 0.50) * clamp(speed / 240, 0, 1);
-    const om = 2 * T.zeta * T.align, damp = 2 * T.zeta * om;
-    const yawAcc = om * om * shape * w - damp * car.av + inp * T.turn * turnScale * damp;
+    const om = 2 * P.zeta * P.align, damp = 2 * P.zeta * om;
+    const yawAcc = om * om * shape * w - damp * car.av + inp * P.turn * turnScale * damp;
     car.av += yawAcc * dt;
     car.a += car.av * dt;
   }
@@ -80,20 +81,20 @@ export function integrate(car, inp, dt, window = 45) {
   const wasBoost = car.boosting;
   car.boosting = inp === 0 && car.boost > 0 && speed > 140;
   if (car.boosting && !wasBoost) flags |= BOOST_IGNITED;
-  if (car.boosting) car.boost = Math.max(0, car.boost - T.boostDrain * dt);
+  if (car.boosting) car.boost = Math.max(0, car.boost - P.boostDrain * dt);
 
-  const top = (car.boosting ? T.boostSpeed : T.maxSpeed) * (car.off ? 0.52 : 1);
-  const acc = car.boosting ? T.boostAccel : T.accel;
+  const top = (car.boosting ? P.boostSpeed : P.maxSpeed) * (car.off ? 0.52 : 1);
+  const acc = car.boosting ? P.boostAccel : P.accel;
   fwd += acc * dt;
   if (fwd > top) fwd = lerp(fwd, top, 1 - Math.exp(-6 * dt));
   // sliding sideways scrubs speed — that's the cost of drifting
-  fwd *= Math.exp(-((car.off ? T.offDrag : 0.30) + Math.abs(lat) / T.scrub) * dt);
+  fwd *= Math.exp(-((car.off ? P.offDrag : 0.30) + Math.abs(lat) / P.scrub) * dt);
 
   // --- friction circle: grip can only correct so much sideways motion per second.
   // Holding the turn breaks traction (lower ceiling); releasing restores the ceiling
   // but the slide already in the car still has to bleed off, so it persists.
-  const latMax = lerp(T.gripMax, T.gripSlide, car.charge) * (car.off ? 0.45 : 1);
-  const corr = Math.min(Math.abs(lat) * T.stiffness, latMax) * dt;
+  const latMax = lerp(P.gripMax, P.gripSlide, car.charge) * (car.off ? 0.45 : 1);
+  const corr = Math.min(Math.abs(lat) * P.stiffness, latMax) * dt;
   lat -= Math.sign(lat) * Math.min(Math.abs(lat), corr);
 
   car.vx = hx * fwd + -hy * lat; car.vy = hy * fwd + hx * lat;
@@ -102,9 +103,9 @@ export function integrate(car, inp, dt, window = 45) {
   // into a slide and regaining it on exit run on different clocks.
   const beta = Math.atan2(lat, Math.max(Math.abs(fwd), 50));
   const slipT = Math.abs(Math.sin(beta));
-  const slipLag = slipT > car.slipSm ? T.slipLagIn : T.slipLagOut;
+  const slipLag = slipT > car.slipSm ? P.slipLagIn : P.slipLagOut;
   car.slipSm += (slipT - car.slipSm) * (1 - Math.exp(-dt / slipLag));
-  const cap = top * (1 - T.slipCost * car.slipSm);
+  const cap = top * (1 - P.slipCost * car.slipSm);
   const tot = Math.hypot(car.vx, car.vy);
   if (tot > cap) { const k = cap / tot; car.vx *= k; car.vy *= k; }
 
@@ -125,20 +126,20 @@ export function integrate(car, inp, dt, window = 45) {
   car.prog = p;
 
   const wasOff = car.off;
-  car.off = near.dist > HALF_W;
+  car.off = near.dist > track.halfW;
   if (car.off && !wasOff) {
     flags |= WENT_OFF;
-    car.mult = 1;
+    if (P.multResetOff) car.mult = 1;
   }
 
   // drifting fills boost
-  const sliding = car.drift > T.driftMin && speed > 210 && !car.off;
+  const sliding = car.drift > P.driftMin && speed > 210 && !car.off;
   if (sliding) {
     flags |= SLIDING;
-    car.boost = Math.min(T.boostCap, car.boost + dt * car.drift * (speed / T.maxSpeed) * T.boostFill * car.mult);
-    car.mult = Math.min(4, car.mult + dt * 0.30);
+    car.boost = Math.min(P.boostCap, car.boost + dt * car.drift * (speed / P.maxSpeed) * P.boostFill * car.mult);
+    car.mult = Math.min(P.multCap, car.mult + dt * P.multRise);
   } else if (!car.off) {
-    car.mult = Math.max(1, car.mult - dt * 0.10);
+    car.mult = Math.max(1, car.mult - dt * P.multFall);
   }
 
   return flags;
