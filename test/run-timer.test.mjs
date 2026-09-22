@@ -16,7 +16,9 @@ test("drains one second per second on stage 1, ramped on later stages", () => {
   const run = fresh();
   second(run, 0, carAt(1));
   close(run.timer, TIMER.start - 1, 1e-6);
-  close(drainRate(10, buildFrom([])), Math.pow(TIMER.ramp, 9));
+  close(drainRate(10, buildFrom([])), 1 + (TIMER.drainMax - 1) * (1 - Math.pow(TIMER.rampK, 9)));
+  assert.ok(drainRate(200, buildFrom([])) < TIMER.drainMax, "the drain never reaches its ceiling");
+  assert.ok(drainRate(9, buildFrom([])) > drainRate(8, buildFrom([])), "but it rises every stage");
   close(drainRate(1, buildFrom(["turbo"])), 1.08);
 });
 

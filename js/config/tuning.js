@@ -29,7 +29,7 @@ export const T = {
   boostCap: 1.0, boostDrain: 0.46, boostFill: 0.60,
   offDrag: 2.2,
   multRise: 0.30, multFall: 0.10, multCap: 4,   // chain multiplier: build rate (/s while sliding), decay rate, ceiling
-  multResetOff: true,                            // leaving the road resets the chain to ×1
+  multOffKeep: 0,                                // fraction of the chain above ×1 kept on leaving the road (0 = reset to ×1)
   zoomRange: 0.045,             // how far the view pulls back at full speed
   zoomLag: 0.60,                // seconds for the zoom to follow a speed change
 };

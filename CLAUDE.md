@@ -103,7 +103,9 @@ relatively, or inline it as a `data:` URI.
 A gauntlet of one-lap tracks, each seeded `<day>#run<n>` — a different
 geometry from the daily track and from every other stage. A clock replaces
 the lap timer: it starts at 20s and can hold up to 30s, draining every step at
-a rate that ramps up stage over stage, and refilled only while sliding on the
+a rate that ramps up stage over stage toward a ceiling it never reaches
+(`drainMax`, so a late run is hard but a ×3 chain always breaks even), and
+refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
 keeps you alive, not just finishing laps. Clearing a stage pays `TIMER.bonus`
 seconds, scaled by the build's bonus multiplier. **The chain carries across
@@ -112,8 +114,10 @@ with is the one the next stage starts on (`run.chain`). It has to — the chain
 builds at 0.30/s and a one-lap stage has a second or so of sliding per corner,
 so even the ideal line peaks near ×1.9 inside a single stage; only a chain
 built over several stages can out-earn the ramped drain.
-Off-track never kills a run directly (it costs the chain and, with some mods,
-seconds); the run ends only when the clock reaches zero. `TIMER` in
+Off-track never kills a run directly: a wall keeps half the chain you built
+(`multOffKeep` 0.5 in the run's base build, versus the daily race's full
+reset), and some mods charge seconds instead; the run ends only when the clock
+reaches zero. `TIMER` in
 `js/run/timer.js` is every one of these numbers in one place — the ramp,
 refill gain, and the low-clock and Skip amounts aren't reproduced here.
 
@@ -313,7 +317,7 @@ Conventions:
 | `boostFill` / `boostDrain` / `boostCap` | Boost economy. |
 | `offDrag` | Drag while off-track. |
 | `multRise` / `multFall` / `multCap` | Chain multiplier build rate while sliding, decay rate, ceiling. |
-| `multResetOff` | Leaving the road resets the chain to ×1. A run's Off-road tax mod flips this off. |
+| `multOffKeep` | Fraction of the chain above ×1 that survives leaving the road. 0 in the daily race (a full reset); a run's build uses 0.5, and its Off-road tax mod 1. |
 | `zoomRange` / `zoomLag` | How far the view pulls back at speed, and seconds to follow a speed change. Set `zoomRange` to 0 to lock the zoom. |
 
 ### `CAM` — camera feel

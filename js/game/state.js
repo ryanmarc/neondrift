@@ -27,6 +27,7 @@ export const race = {
   shake: 0,
   breakT: 0,        // "×N LOST" readout timer
   lostMult: 1,
+  keptMult: 1,      // what survived the break (a run keeps part of the chain)
 };
 
 /** Put the car on the start line and clear everything from the previous run. */
@@ -35,6 +36,6 @@ export function resetRace(startSample) {
   race.time = 0; race.finished = false;
   race.marks = []; race.rec = []; race.recAcc = 0;
   race.inputs = []; race.steps = 0; race.lastInput = 0;
-  race.chainFlash = 0; race.shake = 0; race.breakT = 0; race.lostMult = 1;
+  race.chainFlash = 0; race.shake = 0; race.breakT = 0; race.lostMult = 1; race.keptMult = 1;
   race.trail = []; race.trailAcc = 0;
 }

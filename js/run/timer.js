@@ -8,8 +8,10 @@ import { SLIDING, WENT_OFF } from "../game/dynamics.js";
 export const TIMER = {
   start: 20,      // seconds on the clock at stage 1
   cap: 30,        // the most it can hold (× build.cap)
-  drain: 1.0,     // seconds lost per second at stage 1 (× ramp^(stage-1) × build.drain)
-  ramp: 1.08,     // per-stage drain growth; 1.08^9 ≈ 2, so stage 10 drains twice as fast
+  drain: 1.0,     // seconds lost per second at stage 1 (× build.drain)
+  drainMax: 1.75, // the drain approaches this multiple of `drain` and never reaches it —
+  rampK: 0.85,    // closing this much less of the gap each stage (stage 5 ≈ 1.36, stage 9 ≈ 1.55, stage 15 ≈ 1.67).
+                  // A ceiling keeps a late run hard but never impossible: a ×3 chain still breaks even.
   refill: 1.8,    // slide refill gain — see tickTimer for the formula
   bonus: 5,       // seconds for clearing a stage (× build.bonus)
   low: 5,         // "timer-low" fires crossing down through this; re-arms above low + 2
@@ -17,7 +19,8 @@ export const TIMER = {
 };
 
 export function drainRate(stage, build) {
-  return TIMER.drain * Math.pow(TIMER.ramp, stage - 1) * build.drain;
+  const ramp = 1 + (TIMER.drainMax - 1) * (1 - Math.pow(TIMER.rampK, stage - 1));
+  return TIMER.drain * ramp * build.drain;
 }
 
 export function capFor(build) {

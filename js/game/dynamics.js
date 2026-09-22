@@ -129,7 +129,7 @@ export function integrate(car, inp, dt, window = 45, P = T) {
   car.off = near.dist > track.halfW;
   if (car.off && !wasOff) {
     flags |= WENT_OFF;
-    if (P.multResetOff) car.mult = 1;
+    car.mult = 1 + (car.mult - 1) * P.multOffKeep;   // 0 keeps nothing: the daily race's full reset
   }
 
   // drifting fills boost

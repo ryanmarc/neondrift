@@ -23,7 +23,7 @@ test("T carries the chain constants at their previous hardcoded values", () => {
   assert.equal(T.multRise, 0.30);
   assert.equal(T.multFall, 0.10);
   assert.equal(T.multCap, 4);
-  assert.equal(T.multResetOff, true);
+  assert.equal(T.multOffKeep, 0);
 });
 
 test("integrate with the default table equals integrate with a copy of T", () => {
@@ -63,15 +63,19 @@ test("loadTrackGeometry resets track.halfW", () => {
   assert.equal(track.halfW, HALF_W);
 });
 
-test("multResetOff=false keeps the chain through an excursion", () => {
+test("multOffKeep scales what a wall leaves of the chain", () => {
   loadTrackGeometry("params-test");
   const s = track.samples[0];
   const c = createCar(); placeCar(c, s);
   c.mult = 3;
   c.x = s.x + s.nx * (HALF_W + 40); c.y = s.y + s.ny * (HALF_W + 40);
-  integrate(c, 0, PHYSICS_DT, 45, { ...T, multResetOff: false });
+  integrate(c, 0, PHYSICS_DT, 45, { ...T, multOffKeep: 1 });
   assert.equal(c.off, true);
   assert.equal(c.mult, 3);
+  const h = createCar(); placeCar(h, s);
+  h.mult = 3; h.x = c.x; h.y = c.y;
+  integrate(h, 0, PHYSICS_DT, 45, { ...T, multOffKeep: 0.5 });
+  assert.equal(h.mult, 2, "half of the chain above ×1 survives");
   const d = createCar(); placeCar(d, s);
   d.mult = 3; d.x = c.x; d.y = c.y;
   integrate(d, 0, PHYSICS_DT);
@@ -96,13 +100,13 @@ test("chain-break only fires when the chain was actually lost", () => {
   loadTrackGeometry("params-test");
   const s = track.samples[0];
 
-  // Off-road tax: multResetOff false, so an excursion drains the timer instead
+  // Off-road tax: multOffKeep 1, so an excursion drains the timer instead
   // of resetting the chain. The cue must stay silent.
   resetRace(s);
   car.mult = 3;
   car.x = s.x + s.nx * (HALF_W + 40);
   car.y = s.y + s.ny * (HALF_W + 40);
-  race.params = { ...T, multResetOff: false };
+  race.params = { ...T, multOffKeep: 1 };
   let fired = false;
   const off = on("chain-break", () => { fired = true; });
   step(PHYSICS_DT);
@@ -122,6 +126,7 @@ test("chain-break only fires when the chain was actually lost", () => {
   off2();
   assert.equal(fired, true, "the default table must still cue a real loss");
   assert.equal(race.lostMult, 3);
+  assert.equal(race.keptMult, 1);
 
   race.params = T;
 });

@@ -7,9 +7,10 @@ const { MODS, SKIP, byId, baseBuild, held, canPick, buildFrom } = await import(n
 
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, msg || (a + " ≠ " + b));
 
-test("an empty build is the daily race", () => {
+test("an empty build is the daily race, except a wall keeps half the chain", () => {
   const b = buildFrom([]);
-  assert.deepEqual(b.T, T);
+  assert.deepEqual({ ...b.T, multOffKeep: 0 }, T);
+  assert.equal(b.T.multOffKeep, 0.5);
   assert.notEqual(b.T, T, "must be a copy, never T itself");
   assert.deepEqual({ ...b, T: null }, { ...baseBuild(), T: null });
   assert.equal(b.halfW, 1); assert.equal(b.drain, 1); assert.equal(b.refill, 1);
@@ -46,12 +47,12 @@ test("timer, road and rule mods land on the run knobs", () => {
   close(buildFrom(["slow"]).cap, 1 - 4 / 30);
   close(buildFrom(["wide", "tight"]).halfW, 1.12 * 0.88);
   const r = buildFrom(["roller"]); assert.equal(r.refill, 2); assert.equal(r.refillFloorMult, 2);
-  const o = buildFrom(["offtax"]); assert.equal(o.T.multResetOff, false); assert.equal(o.offTax, 2);
+  const o = buildFrom(["offtax"]); assert.equal(o.T.multOffKeep, 1); assert.equal(o.offTax, 2);
   const h = buildFrom(["hot"]); close(h.T.multRise, T.multRise * 1.5); close(h.T.multFall, T.multFall * 2.5);
 });
 
 test("skip entries and unknown ids are ignored by buildFrom", () => {
-  assert.deepEqual(buildFrom(["skip", "nope", "skip"]).T, T);
+  assert.deepEqual(buildFrom(["skip", "nope", "skip"]), baseBuild());
 });
 
 test("held counts and canPick respects max", () => {

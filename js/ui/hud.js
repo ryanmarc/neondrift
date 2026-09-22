@@ -47,7 +47,7 @@ export function updateHud() {
   $fill.classList.toggle("hot", car.boosting);
 
   if (race.breakT > 0) {
-    $chain.textContent = "×" + race.lostMult.toFixed(1) + " LOST";
+    $chain.textContent = "×" + race.lostMult.toFixed(1) + (race.keptMult > 1.05 ? " → ×" + race.keptMult.toFixed(1) : " LOST");
     $chain.className = "broke";
     $chain.style.opacity = Math.min(1, race.breakT * 1.8).toFixed(2);
     $chain.style.transform = "scale(" + (1 + 0.14 * race.breakT).toFixed(3) + ")";

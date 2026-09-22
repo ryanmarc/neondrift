@@ -7,7 +7,7 @@ import { T } from "../config/tuning.js";
 /** The rule set a run drives under. With no picks it is the daily race. */
 export function baseBuild() {
   return {
-    T: { ...T },          // car physics; integrate() reads this instead of T
+    T: { ...T, multOffKeep: 0.5 },   // car physics; a run keeps half the chain on a wall — the chain is its lifeline
     halfW: 1,             // road half-width multiplier, applied when a stage loads
     drain: 1, refill: 1, bonus: 1, cap: 1,   // timer multipliers
     refillFloorMult: 0,   // the timer refills only while car.mult >= this
@@ -70,7 +70,7 @@ export const MODS = [
   // ---- the rules
   { id: "offtax", name: "Off-road tax", max: 1,
     gain: "Leaving the road no longer breaks your chain.", cost: "Every excursion costs 2 seconds instead.",
-    apply(b) { b.T.multResetOff = false; b.offTax = 2; } },
+    apply(b) { b.T.multOffKeep = 1; b.offTax = 2; } },
   { id: "lowbar", name: "Low bar", max: 1,
     gain: "Small slides count as drifting.", cost: "Boost fills 20% slower.",
     apply(b) { pct(b, "driftMin", -0.40); pct(b, "boostFill", -0.20); } },
