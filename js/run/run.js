@@ -10,6 +10,7 @@ import { HALF_W } from "../config/tuning.js";
 import { track, loadTrackGeometry } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { car, race, resetRace } from "../game/state.js";
+import { unloadGhost } from "../game/ghost.js";
 import { loadTrack, start, startStage, setRules } from "../game/race.js";
 import { camera, resetCamera } from "../render/camera.js";
 import { run } from "./state.js";
@@ -32,6 +33,7 @@ export function loadBests(day) {
 function loadStage(n) {
   loadTrackGeometry(stageSeed(run.day, n));
   track.halfW = HALF_W * run.build.halfW;
+  unloadGhost();
   resetRace(track.samples[0]);
   race.params = run.build.T;
   resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
@@ -95,7 +97,7 @@ export function startRun(day = todayUtc()) {
 
 /** Take a card from the current offer and start the next stage at once. */
 export function pick(id) {
-  if (!run.active || run.over || race.running || !run.offer.length) return;
+  if (!run.active || run.over || race.running) return;
   if (id !== SKIP.id && !run.offer.includes(id)) return;
   if (!canPick(run.picks, id)) return;
   run.picks.push(id);
