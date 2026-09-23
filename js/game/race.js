@@ -103,6 +103,8 @@ export function tick(now) {
   const live = race.running && race.countdown <= 0;
   if (live) SFX.update(car.drift, Math.hypot(car.vx, car.vy), car.off, car.boosting);
   else SFX.update(0, 0, false, false);
+  SFX.engineUpdate(live ? { speed: Math.hypot(car.vx, car.vy), boosting: car.boosting, drift: car.drift }
+                        : { speed: 0, boosting: false, drift: 0 }, race.running, race.params, dt);
   Music.update(live, live && car.boosting);
 
   draw(dt, live ? clamp(acc / PHYSICS_DT, 0, 1) : 1);

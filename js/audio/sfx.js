@@ -10,12 +10,14 @@ import { clamp } from "../core/math.js";
 import { on } from "../core/events.js";
 import * as storage from "../core/storage.js";
 import { whenReady } from "./context.js";
+import { createEngine } from "./engine.js";
 
 const MUTE_KEY = "neondrift:mute";
 
 let ctx = null, master = null, noiseBuf = null, noiseSrc = null;
 let squealF = null, squealG = null, harmF = null, harmG = null, scrubF = null, scrubG = null;
 let offF = null, offG = null, airF = null, airG = null, lfo = null, lfoG = null;
+let engine = null;
 let ready = false;
 let muted = storage.read(MUTE_KEY) === "1";
 
@@ -64,6 +66,9 @@ whenReady((c, m) => {
   offF = ctx.createBiquadFilter(); offF.type = "lowpass"; offF.frequency.value = 380;
   offG = ctx.createGain(); offG.gain.value = 0;
   noiseSrc.connect(offF); offF.connect(offG); offG.connect(master);
+
+  // the engine: its own module, on this bus so the effects switch covers it
+  engine = createEngine(ctx, master);
 
   noiseSrc.start();
   ready = true;
@@ -183,6 +188,18 @@ export function update(drift, speed, off, boosting) {
   squealF.frequency.setTargetAtTime(780 + drift * 620, t, 0.09);
   harmF.frequency.setTargetAtTime(1650 + drift * 900, t, 0.09);
   offG.gain.setTargetAtTime(off ? clamp(speed / 480, 0, 1) * 0.44 : 0, t, 0.06);
-  airG.gain.setTargetAtTime(boosting ? 0.083 : 0, t, 0.09);
+  // 0.083 until the engine arrived: it and the engine's full-load voice share
+  // a band and a moment, so the whoosh gives up ~3dB to let the revs through
+  airG.gain.setTargetAtTime(boosting ? 0.06 : 0, t, 0.09);
   airF.frequency.setTargetAtTime(boosting ? 1400 : 700, t, 0.13);
+}
+
+/**
+ * Per-frame engine update with the car's { speed, boosting, drift }. `running`
+ * covers the countdown too (the car is on the line with the motor on); false
+ * fades it out. `P` is the live physics table, so a run's build moves the
+ * gear points with its top speed; `dt` is the frame, for the engine model.
+ */
+export function engineUpdate(input, running, P, dt) {
+  if (ready) engine.update(input, running, P, dt);
 }

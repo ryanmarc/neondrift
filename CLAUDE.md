@@ -194,7 +194,8 @@ js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mo
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
-            sfx.js      effects: update(); subscribes to game events; re-exports the context API
+            sfx.js      effects: update(), engineUpdate(); subscribes to game events; re-exports the context API
+            engine.js   the engine: stepEngine(model, input, dt, P) is pure (gears, revs, load); createEngine(ctx, bus) builds the nodes
             music.js    synthesized synthwave loop; update(live, boosting) picks the mix
 js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
             api.js      fetch wrappers for the leaderboard API; every failure resolves to null
@@ -459,6 +460,26 @@ Wrap every read in try/catch and render correctly when storage is empty.
 - **Keep low sounds above ~140Hz.** Phone speakers distort trying to reproduce
   lower, and that distortion is heard as rasp. The boost thump was lowered twice
   chasing "more subtle" and got worse each time; raising it fixed it.
+- **The engine is gears, load and pulses, not a pitch that tracks speed.**
+  The first version was two sawtooths pitched by speed through a lowpass: a
+  synth pad following a number, and it read as a constant high whine even
+  after being pitched down. `audio/engine.js` is now a small model. Four
+  fictional gears (thrust is always on, so they express nothing physical)
+  make revs climb and fall so the contour keeps moving at a steady speed,
+  with a throttle lift at each shift. Load — boost or hard acceleration —
+  opens the filter and lifts the level; cruise is a low burble ~11dB under
+  that, and a slide is overrun ~20dB under, with one pop as it starts, so the
+  engine gets out of the way exactly while you drift. The tone is a narrow
+  pulse train at the firing rate (a four-cylinder fires at rpm/30 Hz) plus
+  noise gated by the same pulses: a brrr, not an eeee. The firing fundamental
+  sits under the ~140Hz floor, so a 110Hz highpass drops it and the
+  harmonics carry the roughness (the missing-fundamental effect, which is
+  also how a real engine sounds through a phone). Level was set like the
+  rest: A-weighted through a 400Hz phone-speaker rolloff, full load at the
+  redline sits ~4dB under the full squeal and level with the boost whoosh,
+  which gave up 3dB to make room. The first balance, 11dB under, was
+  inaudible under boost and music together. It runs from the countdown
+  (motor on, car on the line) to the finish; `race.running` is that window.
 - **The skid is a resonance, not a hiss.** A real tire squeals because the tread
   grabs and releases — stick-slip. It's a high-Q bandpass (pitched, rings) plus a
   harmonic plus a low scrubbing roar, with an LFO wavering the centre frequency.
@@ -516,9 +537,6 @@ are rejected), validation, and the client identity.
   back as a second ghost is the natural next step.
 - **Turnstile.** If the leaderboard gets abused from scripts, Cloudflare
   Turnstile (invisible mode) bound to the Pages hostname is the free fix.
-- **Engine sound.** Deliberately skipped; it's more work than everything else in
-  the audio module combined. Detuned sawtooths with a speed-driven lowpass.
-  (Music now exists — see `audio/music.js` — but engine noise still doesn't.)
 - **Track selection / multiple tracks.** `loadTrack(seed)` already supports it.
 - **Run leaderboard.** Picks plus per-stage inputs would replay the same way
   the daily leaderboard does; nothing about a run's recording stops it.
