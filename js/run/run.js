@@ -17,7 +17,7 @@ import { run } from "./state.js";
 import { buildFrom, canPick, SKIP } from "./mods.js";
 import { offerFor } from "./offer.js";
 import { TIMER, tickTimer, addBonus } from "./timer.js";
-import { stageSeed, beats, parseBest, bestKeyDay, BEST_KEY_ALL } from "./stages.js";
+import { stageSeed, stageShape, beats, parseBest, bestKeyDay, BEST_KEY_ALL } from "./stages.js";
 
 let savedGuides = false;
 
@@ -27,11 +27,12 @@ export function loadBests(day) {
   run.bestAll = parseBest(storage.read(BEST_KEY_ALL));
 }
 
-// Build stage n's track and put the car on its line. Deliberately not
-// loadTrack(): no ghost, no guides, no track-loaded event, so the leaderboard
-// never fetches a board for a stage and the HUD never rewrites the URL.
+// Build stage n's track (to the ramp's shape for that stage) and put the car
+// on its line. Deliberately not loadTrack(): no ghost, no guides, no
+// track-loaded event, so the leaderboard never fetches a board for a stage and
+// the HUD never rewrites the URL.
 function loadStage(n) {
-  loadTrackGeometry(stageSeed(run.day, n));
+  loadTrackGeometry(stageSeed(run.day, n), stageShape(n));
   track.halfW = HALF_W * run.build.halfW;
   unloadGhost();
   resetRace(track.samples[0]);

@@ -18,10 +18,10 @@ export const track = {
   halfW: HALF_W,   // road half-width in px; a run's road mods scale it, loadTrackGeometry resets it
 };
 
-/** Rebuild the track from a seed string. */
-export function loadTrackGeometry(seed) {
+/** Rebuild the track from a seed string. `shape` (optional) is the generator's target — the run's ramp. */
+export function loadTrackGeometry(seed, shape) {
   const rng = mulberry32(hashStr(seed));
-  const built = buildTrack(rng);
+  const built = buildTrack(rng, shape);
   track.seed = seed;
   track.samples = built.S;
   track.length = built.length;

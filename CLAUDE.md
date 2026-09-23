@@ -132,9 +132,23 @@ from the day and stage (`offerFor` in `js/run/offer.js`), so everyone racing
 the same day sees the same choices in the same order; a mod already held is
 weighted to come up again, so a build converges rather than staying scattershot.
 
+**The track ramps with the stage.** Each stage asks the generator for a
+minimum number of *corners* — the drift guides' count, a stretch of smoothed
+curvature tighter than `GUIDE.minRadius` — rising from 4 at stage 1 to 9 at
+the timer's knee and holding there (`RAMP`, `stageShape(n)` in
+`js/run/stages.js`). More corners, never tighter ones: the 185px minimum
+radius is what the road width, the physics and the simulator's nearest-point
+window assume. The floor was chosen by measurement — the daily generator's
+median is about 5, it finds 9 on almost every seed with its existing
+harmonics, and 11 is where it starts failing; across 280 stage seeds the
+fallback never fires and the median climbs from 6 to 10. The raw
+direction-change count (`flips`) was the first candidate and is useless as a
+ramp: it counts gentle wiggles, so most tracks already have eight.
+
 Score is stages cleared, then progress into the stage that ended it — not
 time. Bests are local only, per day and all-time, in `localStorage`; there is
-no board, no ghost and no optimal line for a stage.
+no board, no ghost and no optimal line for a stage. The run has three sounds
+of its own — stage clear, low clock, run over — on its events in `audio/sfx.js`.
 
 ## Architecture
 
@@ -155,8 +169,8 @@ js/core/    math.js     clamp, lerp, TAU, wrapAngle
             dom.js      $(id)
 js/config/  params.js   URL params, TODAY, FIRST_DAY, date-seed helpers, INITIAL_SEED, GUIDES_FLAG
             tuning.js   T, CAM, GUIDE, LAPS, PHYSICS_DT, GHOST_HZ, T_TICK, T_GO, road size
-js/track/   generator.js  trackFromAmps, buildTrack(rng) — pure
-            track.js      `track` {seed, id, samples}, loadTrackGeometry, nearest
+js/track/   generator.js  trackFromAmps, cornerCount, buildTrack(rng, shape?) — pure
+            track.js      `track` {seed, id, samples}, loadTrackGeometry(seed, shape?), nearest
             guides.js     `guides` {flag, visible, list}, rebuildGuides
 js/game/    state.js    `car`, `race`, resetRace
             daily.js    the daily rollover, and the day browser (gotoDay, gotoToday, canGoDay)
@@ -173,7 +187,7 @@ js/sim/     schedule.js input schedules keyed on track progress; createInput, no
 js/run/     mods.js     the mod catalogue; buildFrom(picks) folds picks into a build (T copy + run knobs)
             offer.js    offerFor(day, stage, picks) — seeded, held-weighted, pure
             timer.js    TIMER constants; tickTimer() runs the clock inside physics steps
-            stages.js   stageSeed, beats (score order), parseBest, storage keys
+            stages.js   stageSeed, stageShape (the track ramp), beats (score order), parseBest, storage keys
             state.js    the mutable `run` object (leaf, so the HUD can read it)
             run.js      startRun, pick, restart, abandon; the run's rules object; loadStage
 js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
@@ -237,6 +251,10 @@ Conventions:
   sampled centerline. Change the generator and every seed produces a new id, so
   stale ghosts can never appear on a track they weren't set on. Don't "simplify"
   this back to a date key.
+- **The generator's default path is pinned.** `buildTrack(rng, shape)` with no
+  shape must draw the same rng values and accept the same candidate as it
+  always has, or every stored track id, ghost and leaderboard time is orphaned.
+  `test/run-ramp.test.mjs` pins one daily id; only the run passes a shape.
 - **Camera smoothing must be framerate-independent.** Use
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
@@ -433,7 +451,7 @@ Wrap every read in try/catch and render correctly when storage is empty.
 - **Track generator uses sine harmonics, not radial control points.** Points at
   monotonically increasing angles almost guarantee same-direction corners only.
   Generator rejects layouts with min radius < 185px or fewer than 4 direction
-  changes.
+  changes; a run's stages add a corner floor on top (see the track ramp).
 - **Audio levels were solved, not eyeballed.** Gains are balanced by A-weighted
   loudness through a phone-speaker rolloff. Raw gain numbers are misleading: a
   Q=12 bandpass passes ~75Hz of bandwidth, so `0.4` of that is far quieter than
@@ -506,9 +524,7 @@ are rejected), validation, and the client identity.
   the daily leaderboard does; nothing about a run's recording stops it.
 - **Route choice.** Offers are a single set of three cards plus Skip; there is
   no branching path through a stage.
-- **Track ramp for later stages.** Every stage is generated the same way,
-  regardless of how far the run has gone.
-- **Run sounds.** `timer-low` already fires (see `core/events.js`); nothing
-  subscribes to it yet.
+- **Longer laps for later stages.** The ramp adds corners; the base radius
+  (lap length) is the same at every stage and would be a second knob.
 - **Run ghost.** No stage records or replays a run's own line, unlike the
   daily race's ghost.

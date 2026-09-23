@@ -3,7 +3,7 @@
 // sample. Pure: everything comes from the rng that is passed in.
 
 import { TAU, lerp } from "../core/math.js";
-import { STEP } from "../config/tuning.js";
+import { STEP, GUIDE } from "../config/tuning.js";
 
 /**
  * Build one candidate track from a base radius and a list of harmonics
@@ -53,12 +53,41 @@ export function trackFromAmps(R0, amps) {
 }
 
 /**
- * Search for a layout that is drivable (min radius > 185px) and interesting
- * (at least 4 direction changes). Falls back to the best rejected candidate.
+ * Corners on a centreline, by the drift guides' rule: a stretch of smoothed
+ * curvature tighter than GUIDE.minRadius for longer than GUIDE.minCorner.
+ * The same test as guides.js's buildGuides (which also places markers); kept
+ * apart because that module owns live state and importing it would be a cycle.
  */
-export function buildTrack(rng) {
+export function cornerCount(S) {
+  const N = S.length, cur = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    let s = 0; for (let k = -8; k <= 8; k++) s += S[((i + k) % N + N) % N].curv;
+    cur[i] = s / 17;
+  }
+  const thr = STEP / GUIDE.minRadius;
+  let n = 0, i = 0;
+  while (i < N) {
+    if (Math.abs(cur[i]) > thr) {
+      const sign = Math.sign(cur[i]); let j = i;
+      while (j - i < N && Math.abs(cur[j % N]) > thr * 0.5 && Math.sign(cur[j % N]) === sign) j++;
+      if ((j - i) * STEP > GUIDE.minCorner) n++;
+      i = j;
+    } else i++;
+  }
+  return n;
+}
+
+/**
+ * Search for a layout that is drivable (min radius > shape.minR, 185px) and
+ * interesting (at least 4 direction changes, and at least shape.corners real
+ * corners when asked — the run's track ramp). Falls back to the best rejected
+ * candidate. With no shape the search is exactly the daily race's: the same
+ * rng draws, the same first acceptable layout, so every stored track id holds.
+ */
+export function buildTrack(rng, shape = {}) {
+  const minR = shape.minR ?? 185, corners = shape.corners ?? 0;
   const R0 = 1080 + rng() * 470;
-  let fallback = null;
+  let fallback = null, fallbackScore = -1;
   for (let attempt = 0; attempt < 24; attempt++) {
     const pool = [2, 3, 4, 5, 6, 7];
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
@@ -72,8 +101,9 @@ export function buildTrack(rng) {
       // shrink tight high harmonics faster than the broad shape-defining ones
       const amps = base.map(h => ({ k: h.k, a: h.a * scale * Math.pow(scale < 1 ? 0.95 : 1, Math.max(0, h.k - 4) * shrink), p: h.p }));
       const t = trackFromAmps(R0, amps);
-      if (t.minR > 185 && t.flips >= 4) return t;
-      if (!fallback || (t.flips > fallback.flips && t.minR > 170)) fallback = t;
+      const score = corners ? cornerCount(t.S) : t.flips;   // what the fallback ranks by
+      if (t.minR > minR && t.flips >= 4 && (!corners || score >= corners)) return t;
+      if (!fallback || (score > fallbackScore && t.minR > 170)) { fallback = t; fallbackScore = score; }
       scale *= 0.90;
     }
   }
