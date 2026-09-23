@@ -2,8 +2,9 @@
 // sounds are persistent nodes nudged via setTargetAtTime (never rebuilt per
 // frame, which crackles). One-shots are built on demand and self-destruct.
 //
-// Reacts to game events (boost, chain-break, off-track, countdown) so the
-// physics and race loop never import this module for anything but update().
+// Reacts to game events (boost, chain-break, off-track, countdown, and the
+// run's stage-clear / timer-low / run-over) so the physics and race loop never
+// import this module for anything but update().
 
 import { clamp } from "../core/math.js";
 import { on } from "../core/events.js";
@@ -126,10 +127,34 @@ function chainBreak() {                         // combo lost: falling two-tone
   tone(300, 0.22, 0.028, "square", 150, 0.11);
 }
 
+// ---------- run mode ----------
+// Same triangle family as the countdown so they read as the game's own voice;
+// levels sit with count() (0.083 at 440Hz) and GO (0.046 at 900Hz), which were
+// balanced by A-weighted loudness — a 660Hz triangle at ~0.06 lands between them.
+
+function stageClear() {                         // a stage cleared: rising two-note, GO's register
+  tone(660, 0.12, 0.062, "triangle");
+  tone(990, 0.30, 0.046, "triangle", 0, 0.11);
+}
+
+function timerLow() {                           // clock under TIMER.low: three quick pips, up where alarms live
+  // Square, not triangle, so it is not mistaken for a countdown tick; short so
+  // it never masks the squeal that is the way out of it.
+  for (let i = 0; i < 3; i++) tone(1320, 0.055, 0.026, "square", 0, i * 0.10);
+}
+
+function runOver() {                            // the clock hit zero: lower and longer than the chain-break fall
+  tone(440, 0.30, 0.036, "square", 220);
+  tone(220, 0.55, 0.030, "square", 150, 0.24);
+}
+
 on("boost", boost);
 on("chain-break", chainBreak);
 on("off-track", limit);
 on("countdown", count);
+on("stage-clear", stageClear);
+on("timer-low", timerLow);
+on("run-over", runOver);
 
 // ---------- public API ----------
 
