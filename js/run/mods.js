@@ -3,15 +3,26 @@
 // here is a first guess; tune by editing this file.
 
 import { T } from "../config/tuning.js";
+import { TIMER } from "./timer.js";
 
-/** The rule set a run drives under. With no picks it is the daily race. */
+/** The rule set a run drives under. With no picks it is the daily race, plus the run's own keys at stock. */
 export function baseBuild() {
   return {
-    T: { ...T, multOffKeep: 0.5 },   // car physics; a run keeps half the chain on a wall — the chain is its lifeline
+    T: { ...T, multOffKeep: 0.5,   // car physics; a run keeps half the chain on a wall — the chain is its lifeline
+         slideSpeed: 210, boostSteer: false, multSpeed: 0, offFree: 0 },   // dynamics.js's optional keys, at their stock values
     halfW: 1,             // road half-width multiplier, applied when a stage loads
-    drain: 1, refill: 1, bonus: 1, cap: 1,   // timer multipliers
+    drain: 1, refill: 1, bonus: 1, cap: 1,   // timer multipliers; cap is 1 + seconds/TIMER.cap so cards add seconds
     refillFloorMult: 0,   // the timer refills only while car.mult >= this
     offTax: 0,            // seconds lost per off-track excursion (0 = none)
+    lapScale: 1,          // stage geometry scale, applied on the next stage load
+    spanScale: 1,         // camera world-span multiplier (under 1 = closer)
+    hideClock: false,     // the clock readout is hidden until it is low
+    skip: 1,              // Skip pays TIMER.skip × this
+    lump: 0,              // seconds paid at pick time, in total; pick() applies the change
+    knee: TIMER.knee,     // the stage the drain creep starts at
+    lives: 0,             // second winds this run
+    startBoost: 0,        // fraction of boostCap the car starts every stage with
+    bonusFlat: 0,         // seconds added to every stage clear
   };
 }
 

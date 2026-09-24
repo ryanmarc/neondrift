@@ -15,6 +15,7 @@ export const run = {
   offer: [],          // the mod ids on the current offer screen
   lowArmed: true,     // timer-low fires once per dip
   chain: 1,           // the chain multiplier carried from stage to stage (a run is one continuous drive)
+  livesUsed: 0,       // second winds spent this run
   bestDay: null,      // { stages, prog, picks } for run.day, or null
   bestAll: null,      // { stages, prog, picks, day } or null
 };

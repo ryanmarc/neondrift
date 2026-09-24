@@ -20,6 +20,7 @@
 //   offer ({ cleared, bonus, mods }) – the offer screen should show these mod ids
 //   run-over ({ score, best, isBest, picks }) – the timer hit zero
 //   timer-low                     – the clock dipped under TIMER.low
+//   second-wind                   – the clock hit zero and a Second wind refilled it (run/run.js)
 
 const listeners = new Map();
 

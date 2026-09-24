@@ -12,6 +12,7 @@ export const camera = {
   av: 0,            // rotation velocity (the spring state)
   lx: 0, ly: 0,     // smoothed look-ahead offset
   chase: false,     // false = fixed orientation, true = rotate with travel
+  spanScale: 1,     // a run's Wide angle pulls the view in; the run sets it, 1 otherwise
 };
 
 /** Snap the camera onto the car (race start, track load). */
@@ -28,7 +29,7 @@ export function updateCamera(car, rx, ry, ra, W, H, dt) {
   // Show more of the world on a bigger viewport. Mapping a fixed world span to the
   // short edge made everything huge on desktop; the clamp leaves phones untouched.
   const vmin = Math.min(W, H);
-  const span = (camera.chase ? CAM.spanChase : CAM.spanFixed) * clamp(vmin / 420, 1, 1.85);
+  const span = (camera.chase ? CAM.spanChase : CAM.spanFixed) * clamp(vmin / 420, 1, 1.85) * camera.spanScale;
   // Zoom tracks actual speed on a slow lag, rather than stepping the moment boost
   // toggles — a binary flag made the view pop in and out at the ends of every boost.
   const sp = Math.hypot(car.vx, car.vy);

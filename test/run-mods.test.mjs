@@ -7,14 +7,18 @@ const { MODS, SKIP, byId, baseBuild, held, canPick, buildFrom } = await import(n
 
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, msg || (a + " ≠ " + b));
 
-test("an empty build is the daily race, except a wall keeps half the chain", () => {
+test("an empty build is the daily race, except a wall keeps half the chain, plus the run's own keys at stock", () => {
   const b = buildFrom([]);
-  assert.deepEqual({ ...b.T, multOffKeep: 0 }, T);
+  const { slideSpeed, boostSteer, multSpeed, offFree, ...rest } = b.T;
+  assert.deepEqual({ ...rest, multOffKeep: 0 }, T);
+  assert.deepEqual({ slideSpeed, boostSteer, multSpeed, offFree }, { slideSpeed: 210, boostSteer: false, multSpeed: 0, offFree: 0 });
   assert.equal(b.T.multOffKeep, 0.5);
   assert.notEqual(b.T, T, "must be a copy, never T itself");
   assert.deepEqual({ ...b, T: null }, { ...baseBuild(), T: null });
-  assert.equal(b.halfW, 1); assert.equal(b.drain, 1); assert.equal(b.refill, 1);
-  assert.equal(b.bonus, 1); assert.equal(b.cap, 1); assert.equal(b.refillFloorMult, 0); assert.equal(b.offTax, 0);
+  assert.deepEqual({ ...b, T: undefined }, {
+    T: undefined, halfW: 1, drain: 1, refill: 1, bonus: 1, cap: 1, refillFloorMult: 0, offTax: 0,
+    lapScale: 1, spanScale: 1, hideClock: false, skip: 1, lump: 0, knee: 8, lives: 0, startBoost: 0, bonusFlat: 0,
+  });
 });
 
 test("the catalogue is well-formed", () => {

@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 
 const root = new URL("../js/", import.meta.url);
 const { T, PHYSICS_DT } = await import(new URL("config/tuning.js", root));
-const { SLIDING, WENT_OFF } = await import(new URL("game/dynamics.js", root));
+const { SLIDING, WENT_OFF, OFF_FREE } = await import(new URL("game/dynamics.js", root));
 const { buildFrom } = await import(new URL("run/mods.js", root));
-const { TIMER, drainRate, capFor, tickTimer, addBonus } = await import(new URL("run/timer.js", root));
+const { TIMER, drainRate, capFor, tickTimer, addBonus, addLump } = await import(new URL("run/timer.js", root));
 
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, a + " ≠ " + b);
-const fresh = (over = {}) => ({ timer: TIMER.start, stage: 1, build: buildFrom([]), lowArmed: true, ...over });
+const fresh = (over = {}) => ({ timer: TIMER.start, stage: 1, build: buildFrom([]), lowArmed: true, livesUsed: 0, ...over });
 const carAt = (mult, drift = 0.8, speed = T.maxSpeed) => ({ mult, drift, vx: speed, vy: 0 });
 const second = (run, flags, car) => { let r; for (let i = 0; i < 120; i++) r = tickTimer(run, flags, car, PHYSICS_DT); return r; };
 
@@ -85,4 +85,39 @@ test("addBonus caps", () => {
   const run = fresh({ timer: TIMER.cap - 1 });
   addBonus(run, 10);
   close(run.timer, TIMER.cap);
+});
+
+test("the drain creep starts at the build's knee", () => {
+  const early = buildFrom([]); early.knee = 6;
+  assert.ok(drainRate(7, early) > drainRate(7, buildFrom([])), "a lower knee drains sooner");
+  close(drainRate(6, early), drainRate(6, buildFrom([])));
+});
+
+test("a free excursion (OFF_FREE) is not taxed", () => {
+  const run = fresh({ build: buildFrom(["offtax"]) });
+  tickTimer(run, WENT_OFF | OFF_FREE, carAt(1), PHYSICS_DT);
+  close(run.timer, TIMER.start - PHYSICS_DT, 1e-6);
+});
+
+test("second wind: zero refills to TIMER.wind once per run, re-arms the low cue, then the next zero ends it", () => {
+  const b = buildFrom([]); b.lives = 1;
+  const run = fresh({ build: b, timer: PHYSICS_DT / 2, lowArmed: false, livesUsed: 0 });
+  const r = tickTimer(run, 0, carAt(1), PHYSICS_DT);
+  assert.equal(r.over, false); assert.equal(r.wind, true);
+  close(run.timer, TIMER.wind); assert.equal(run.livesUsed, 1); assert.equal(run.lowArmed, true);
+  run.timer = PHYSICS_DT / 2;
+  const r2 = tickTimer(run, 0, carAt(1), PHYSICS_DT);
+  assert.equal(r2.over, true); assert.equal(r2.wind, false); assert.equal(run.timer, 0);
+});
+
+test("a lump sum can leave one second but never zero, and never exceeds the cap", () => {
+  const low = fresh({ timer: 3 });
+  addLump(low, -5);
+  close(low.timer, TIMER.lumpFloor);
+  const high = fresh({ timer: TIMER.cap - 1 });
+  addLump(high, 5);
+  close(high.timer, TIMER.cap);
+  const mid = fresh({ timer: 12 });
+  addLump(mid, -5);
+  close(mid.timer, 7);
 });

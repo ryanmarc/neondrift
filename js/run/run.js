@@ -16,7 +16,7 @@ import { camera, resetCamera } from "../render/camera.js";
 import { run } from "./state.js";
 import { buildFrom, canPick, SKIP } from "./mods.js";
 import { offerFor } from "./offer.js";
-import { TIMER, tickTimer, addBonus } from "./timer.js";
+import { TIMER, tickTimer, addBonus, addLump } from "./timer.js";
 import { stageSeed, stageShape, beats, parseBest, bestKeyDay, BEST_KEY_ALL } from "./stages.js";
 
 let savedGuides = false;
@@ -37,7 +37,9 @@ function loadStage(n) {
   unloadGhost();
   resetRace(track.samples[0]);
   car.mult = run.chain;                // the chain carries over; the reset put it back to ×1
+  car.boost = run.build.T.boostCap * run.build.startBoost;   // Kickstart
   race.params = run.build.T;
+  camera.spanScale = run.build.spanScale;
   resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
   run.stage = n;
   run.stages.push({ seed: track.seed, id: track.id, inputs: null, time: null, prog: 0 });
@@ -48,6 +50,7 @@ const runRules = {
   onStep(flags, dt) {
     const r = tickTimer(run, flags, car, dt);
     if (r.low) emit("timer-low");
+    if (r.wind) emit("second-wind");
     return r.over;
   },
   onFinish(reason) {
@@ -62,7 +65,7 @@ const runRules = {
 
 function stageClear() {
   const cleared = run.stage;
-  const bonus = TIMER.bonus * run.build.bonus;
+  const bonus = TIMER.bonus * run.build.bonus + run.build.bonusFlat;
   addBonus(run, bonus);
   emit("stage-clear", { stage: cleared, bonus });
   run.offer = offerFor(run.day, cleared, run.picks);
@@ -87,7 +90,7 @@ function runOver() {
 export function startRun(day = todayUtc()) {
   if (run.active) leave();
   run.active = true; run.over = false; run.day = day;
-  run.stage = 0; run.timer = TIMER.start; run.lowArmed = true; run.chain = 1;
+  run.stage = 0; run.timer = TIMER.start; run.lowArmed = true; run.chain = 1; run.livesUsed = 0;
   run.picks = []; run.build = buildFrom([]); run.stages = []; run.offer = [];
   loadBests(day);
   savedGuides = guides.visible; guides.visible = false;
@@ -104,15 +107,19 @@ export function pick(id) {
   if (id !== SKIP.id && !run.offer.includes(id)) return;
   if (!canPick(run.picks, id)) return;
   run.picks.push(id);
-  if (id === SKIP.id) addBonus(run, TIMER.skip);
+  if (id === SKIP.id) addBonus(run, TIMER.skip * run.build.skip);
   else {
+    const prev = run.build;
     run.build = buildFrom(run.picks);
+    if (run.build.lump !== prev.lump) addLump(run, run.build.lump - prev.lump);   // Overtime's "−5 seconds now"
     track.halfW = HALF_W * run.build.halfW;
     race.params = run.build.T;
+    camera.spanScale = run.build.spanScale;
   }
   run.offer = [];
   start();                             // every stage gets the 3-2-1, like the daily race
   car.mult = run.chain;                // start() resets the car too
+  car.boost = run.build.T.boostCap * run.build.startBoost;
   emit("stage-start", run.stage);
 }
 
@@ -121,6 +128,7 @@ function leave() {
   setRules(null);
   race.running = false; race.finished = false;
   run.active = false; run.over = false; run.offer = [];
+  camera.spanScale = 1;
   guides.visible = savedGuides;
 }
 
