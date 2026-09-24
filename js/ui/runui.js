@@ -23,8 +23,9 @@ function card(id) {
   const m = id === SKIP.id ? SKIP : byId.get(id);
   const n = held(run.picks, id);
   const pips = m.max > 1 ? '<span class="pips">' + "●".repeat(n) + "○".repeat(m.max - n) + "</span>" : "";
+  const kind = m.kind ? '<span class="ckind">' + esc(m.kind) + "</span>" : "";   // what the card touches; Skip has none
   return '<button type="button" class="card' + (id === SKIP.id ? " skip" : "") + '" data-id="' + esc(id) + '" data-pad>'
-    + '<span class="cname">' + esc(m.name) + pips + "</span>"
+    + '<span class="cname">' + esc(m.name) + pips + kind + "</span>"
     + '<span class="cgain">' + esc(m.gain) + "</span>"
     + (m.cost ? '<span class="ccost">' + esc(m.cost) + "</span>" : "")
     + "</button>";
