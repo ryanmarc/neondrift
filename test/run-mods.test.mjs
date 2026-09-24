@@ -83,7 +83,7 @@ test("the character cards", () => {
   const b = buildFrom(["boat"]); close(b.T.slipCost, 0.05); close(b.T.scrub, T.scrub * 0.5); close(b.T.turn, T.turn * 0.75); close(b.T.chargeDown, T.chargeDown * 1.4);
   const w = buildFrom(["twitch"]); close(w.T.turn, T.turn * 1.4); close(w.T.chargeUp, 0.08); close(w.T.gripSlide, T.gripSlide * 1.3);
   const r = buildFrom(["rocket"]); close(r.T.boostAccel, T.boostAccel * 2); close(r.T.boostDrain, T.boostDrain * 2);
-  const g = buildFrom(["glide"]); close(g.T.boostDrain, T.boostDrain * 0.5); close(g.T.boostAccel, T.boostAccel * 0.6);
+  const g = buildFrom(["glide"]); close(g.T.boostDrain, T.boostDrain * 0.35); close(g.T.boostAccel, T.boostAccel * 0.5);
   const f = buildFrom(["afterburner"]); assert.equal(f.T.boostSteer, true); close(f.T.boostFill, T.boostFill * 0.5);
   const n = buildFrom(["snowball"]); close(n.T.multSpeed, 0.06); assert.equal(n.T.multOffKeep, 0);
   close(buildFrom(["snowball", "snowball"]).T.multSpeed, 0.12);
