@@ -51,3 +51,12 @@ test("loadTrackGeometry passes the shape through", () => {
   loadTrackGeometry("2026-09-22#run6", stageShape(9));
   assert.ok(cornerCount(track.samples) >= 9);
 });
+
+test("the fallback never returns a corner tighter than the road: two seeds that used to", () => {
+  // Found by sweeping 720 stage seeds: no candidate was accepted, and the
+  // fallback kept a first candidate with a tightest radius under 100px.
+  for (const seed of ["2026-11-12#run12", "2026-11-14#run12"]) {
+    const t = buildTrack(rngFor(seed), stageShape(12));
+    assert.ok(t.minR > 185, seed + " minR " + t.minR.toFixed(0));
+  }
+});

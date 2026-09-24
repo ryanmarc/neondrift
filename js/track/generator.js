@@ -87,7 +87,7 @@ export function cornerCount(S) {
 export function buildTrack(rng, shape = {}) {
   const minR = shape.minR ?? 185, corners = shape.corners ?? 0;
   const R0 = 1080 + rng() * 470;
-  let fallback = null, fallbackScore = -1;
+  let fallback = null, fallbackScore = -1, fallbackOk = false;
   for (let attempt = 0; attempt < 24; attempt++) {
     const pool = [2, 3, 4, 5, 6, 7];
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
@@ -103,7 +103,15 @@ export function buildTrack(rng, shape = {}) {
       const t = trackFromAmps(R0, amps);
       const score = corners ? cornerCount(t.S) : t.flips;   // what the fallback ranks by
       if (t.minR > minR && t.flips >= 4 && (!corners || score >= corners)) return t;
-      if (!fallback || (score > fallbackScore && t.minR > 170)) { fallback = t; fallbackScore = score; }
+      // With no shape the daily race's ranking is kept exactly. A run's shape
+      // ranks a candidate that clears the radius floor above any that doesn't:
+      // the old rule kept a first candidate with a 90px corner (inside the
+      // road) because nothing that was drivable also beat its corner count.
+      const ok = t.minR > minR;
+      const better = !fallback || (corners
+        ? (ok && !fallbackOk) || (ok === fallbackOk && (score > fallbackScore || (score === fallbackScore && t.minR > fallback.minR)))
+        : (score > fallbackScore && t.minR > 170));
+      if (better) { fallback = t; fallbackScore = score; fallbackOk = ok; }
       scale *= 0.90;
     }
   }
