@@ -8,17 +8,20 @@ responsibility as ES modules under `js/`.
 
 Serve it:
 
-    python3 -m http.server 8000
+    python3 serve.py
 
-Then open http://localhost:8000/index.html
+Then open http://localhost:8000/index.html (`serve.py [port]` for another port).
 
 Serve it rather than opening the file from disk — `localStorage` (used for ghosts
 and best times) behaves inconsistently under `file://` in some browsers.
 
-**After editing a module, hard-reload (Cmd+Shift+R).** `http.server` sends no
-`Cache-Control`, so Chrome keeps module scripts for a while under its heuristic
-freshness rule and a plain reload can run stale code. "The change didn't take"
-has meant exactly this twice.
+**Use `serve.py`, not `python3 -m http.server`.** It is the same stdlib server
+with `Cache-Control: no-store` on every response. Without that header Chrome
+keeps module scripts for a while under its heuristic freshness rule and a
+plain reload can run stale code — "the change didn't take" has meant exactly
+this twice. If you do use a bare `http.server`, hard-reload (Cmd+Shift+R)
+after every edit. `serve.py` binds all interfaces, so the LAN phone test
+below works with it unchanged.
 
 ## URL params
 

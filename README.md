@@ -10,16 +10,18 @@ is synthesized at runtime, and every pixel is drawn on a canvas.
 
 ## Play it
 
-Serve the folder with any static file server and open `index.html`:
+Serve the folder and open `index.html`:
 
 ```
-python3 -m http.server 8000
+python3 serve.py
 ```
 
 Then go to http://localhost:8000/index.html. Serve it rather than opening the
 file from disk, because module scripts and `localStorage` both misbehave under
-`file://`. After editing a module, hard-reload (Cmd+Shift+R): the Python server
-sends no cache headers and Chrome will happily run a stale module otherwise.
+`file://`. `serve.py` is Python's built-in static server with caching turned
+off, so a plain reload always picks up your edits. Any other static server
+works too, but with `python3 -m http.server` you must hard-reload
+(Cmd+Shift+R) after editing a module or Chrome may run a stale one.
 
 **Controls**
 
