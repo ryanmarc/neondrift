@@ -42,7 +42,7 @@ export function updateHud() {
     } else $delta.textContent = "";
   }
   // the boost bar and the chain are shared by both modes
-  $fill.style.width = (car.boost * 100) + "%";
+  $fill.style.width = (car.boost / race.params.boostCap * 100) + "%";   // a run's Long tank raises the cap
   $fill.style.opacity = car.boost < 0.004 ? "0" : "1";
   $fill.classList.toggle("hot", car.boosting);
 

@@ -122,3 +122,12 @@ test("held counts and canPick respects max", () => {
   assert.equal(canPick(["skip", "skip"], "skip"), true);
   assert.equal(canPick([], "nope"), false);
 });
+
+test("Snowball's wall reset yields to Off-road tax in either order: the tax already charges for the wall", () => {
+  for (const picks of [["offtax", "snowball"], ["snowball", "offtax"]]) {
+    const b = buildFrom(picks);
+    assert.equal(b.T.multOffKeep, 1, picks.join(","));
+    assert.equal(b.offTax, 2, picks.join(","));
+  }
+  assert.equal(buildFrom(["snowball"]).T.multOffKeep, 0);
+});

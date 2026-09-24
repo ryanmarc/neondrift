@@ -39,8 +39,8 @@ const capSec = (b, s) => { b.cap += s / TIMER.cap; };   // the clock's cap in se
  * pick it displaced. Every other card's cost is in a different currency than
  * its gain, and no card makes the clock drain faster.
  *
- * Where two cards set the same key (Off-road tax and Snowball on multOffKeep)
- * the later pick wins. Caps take the tightest held (Hot chain, Lock).
+ * Caps take the tightest held (Hot chain, Lock). Snowball's wall reset yields
+ * to Off-road tax in either order: the tax already charges for the wall.
  */
 export const MODS = [
   // ---- the car
@@ -91,8 +91,8 @@ export const MODS = [
     gain: "Boost keeps firing while you steer. The meter fills half as fast.", cost: "",
     apply(b) { b.T.boostSteer = true; b.T.boostFill *= 0.5; } },
   { id: "snowball", name: "Snowball", kind: "character", max: 2,
-    gain: "Top speed +6% per ×1 of chain. A wall resets the chain fully.", cost: "",
-    apply(b) { b.T.multSpeed += 0.06; b.T.multOffKeep = 0; } },
+    gain: "Top speed +6% per ×1 of chain. A wall resets the chain fully (unless you hold Off-road tax).", cost: "",
+    apply(b) { b.T.multSpeed += 0.06; if (!b.offTax) b.T.multOffKeep = 0; } },
   // ---- the clock and the chain
   { id: "slow", name: "Slow burn", kind: "clock", max: 2,
     gain: "The clock drains 15% slower.", cost: "It can hold 5 seconds less.",
@@ -125,7 +125,7 @@ export const MODS = [
   // ---- the rules
   { id: "offtax", name: "Off-road tax", kind: "rules", max: 1,
     gain: "Leaving the road no longer breaks your chain.", cost: "Every excursion costs 2 seconds instead.",
-    apply(b) { b.T.multOffKeep = 1; b.offTax = 2; } },
+    apply(b) { b.T.multOffKeep = 1; b.offTax = 2; } },   // also overrides Snowball's reset, in either order
   { id: "lowbar", name: "Low bar", kind: "rules", max: 1,
     gain: "Small slides count as drifting.", cost: "Skip pays nothing for the rest of the run.",
     apply(b) { pct(b, "driftMin", -0.40); b.skip = 0; } },

@@ -10,6 +10,7 @@ import { run } from "../run/state.js";
 import { pick, abandon, startRun, loadBests } from "../run/run.js";
 import { beats } from "../run/stages.js";
 import { byId, SKIP, held } from "../run/mods.js";
+import { TIMER } from "../run/timer.js";
 import * as SFX from "../audio/sfx.js";
 
 const $overlay = $("overlay");
@@ -24,9 +25,13 @@ function card(id) {
   const n = held(run.picks, id);
   const pips = m.max > 1 ? '<span class="pips">' + "●".repeat(n) + "○".repeat(m.max - n) + "</span>" : "";
   const kind = m.kind ? '<span class="ckind">' + esc(m.kind) + "</span>" : "";   // what the card touches; Skip has none
+  // Skip pays TIMER.skip × build.skip; Low bar sets that to 0, and the card must say so.
+  const gain = id === SKIP.id
+    ? (run.build.skip ? "+" + TIMER.skip * run.build.skip + " seconds on the clock, nothing else." : "Nothing. Low bar took it.")
+    : m.gain;
   return '<button type="button" class="card' + (id === SKIP.id ? " skip" : "") + '" data-id="' + esc(id) + '" data-pad>'
     + '<span class="cname">' + esc(m.name) + pips + kind + "</span>"
-    + '<span class="cgain">' + esc(m.gain) + "</span>"
+    + '<span class="cgain">' + esc(gain) + "</span>"
     + (m.cost ? '<span class="ccost">' + esc(m.cost) + "</span>" : "")
     + "</button>";
 }

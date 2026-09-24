@@ -127,7 +127,7 @@ built over several stages can out-earn the ramped drain.
 Off-track never kills a run directly: a wall keeps half the chain you built
 (`multOffKeep` 0.5 in the run's base build, versus the daily race's full
 reset), and some mods charge seconds instead; the run ends only when the clock
-reaches zero. `TIMER` in
+reaches zero (once, if Second wind is held, zero refills to 8s instead). `TIMER` in
 `js/run/timer.js` is every one of these numbers in one place — the ramp,
 refill gain, and the low-clock and Skip amounts aren't reproduced here.
 

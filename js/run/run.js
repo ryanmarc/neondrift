@@ -112,6 +112,13 @@ export function pick(id) {
     const prev = run.build;
     run.build = buildFrom(run.picks);
     if (run.build.lump !== prev.lump) addLump(run, run.build.lump - prev.lump);   // Overtime's "−5 seconds now"
+    if (run.build.lapScale !== prev.lapScale) {
+      // Wide road: the stage behind the offer was built at the old lap scale.
+      // Rebuild it so the cost lands with the gain, not one stage later (or never, on the last offer).
+      loadTrackGeometry(stageSeed(run.day, run.stage), { ...stageShape(run.stage), lapScale: run.build.lapScale });
+      const cur = run.stages[run.stages.length - 1];
+      cur.seed = track.seed; cur.id = track.id;
+    }
     track.halfW = HALF_W * run.build.halfW;
     race.params = run.build.T;
     camera.spanScale = run.build.spanScale;
