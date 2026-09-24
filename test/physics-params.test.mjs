@@ -13,7 +13,7 @@ const root = new URL("../js/", import.meta.url);
 const { track, loadTrackGeometry } = await import(new URL("track/track.js", root));
 const { car, race, resetRace } = await import(new URL("game/state.js", root));
 const { step } = await import(new URL("game/physics.js", root));
-const { createCar, placeCar, integrate } = await import(new URL("game/dynamics.js", root));
+const { createCar, placeCar, integrate, SLIDING, WENT_OFF, OFF_FREE } = await import(new URL("game/dynamics.js", root));
 const { T, HALF_W, PHYSICS_DT } = await import(new URL("config/tuning.js", root));
 const { on } = await import(new URL("core/events.js", root));
 
@@ -129,4 +129,77 @@ test("chain-break only fires when the chain was actually lost", () => {
   assert.equal(race.keptMult, 1);
 
   race.params = T;
+});
+
+const STOCK_KEYS = { slideSpeed: 210, boostSteer: false, multSpeed: 0, offFree: 0 };
+
+test("the run's four extra keys at their stock values change nothing", () => {
+  loadTrackGeometry("params-test");
+  const a = createCar(), b = createCar();
+  placeCar(a, track.samples[0]); placeCar(b, track.samples[0]);
+  for (let i = 0; i < 600; i++) {
+    const inp = (i > 200 && i < 320) || i > 500 ? 1 : 0;
+    integrate(a, inp, PHYSICS_DT); integrate(b, inp, PHYSICS_DT, 45, { ...T, ...STOCK_KEYS });
+  }
+  assert.equal(a.x, b.x); assert.equal(a.y, b.y); assert.equal(a.a, b.a); assert.equal(a.boost, b.boost);
+});
+
+// Drive down the first straight to be at speed but still on the road (a straight
+// drive on this track leaves the road after about 200 steps), then hold.
+function warm(P, steps = 120) {
+  loadTrackGeometry("params-test");
+  const c = createCar(); placeCar(c, track.samples[0]);
+  for (let i = 0; i < steps; i++) integrate(c, 0, PHYSICS_DT, 45, P);
+  return c;
+}
+
+test("slideSpeed gates SLIDING", () => {
+  const P = { ...T, slideSpeed: 1e9 };
+  const c = warm(P);
+  let slid = 0;
+  for (let i = 0; i < 240; i++) if (integrate(c, 1, PHYSICS_DT, 45, P) & SLIDING) slid++;
+  assert.equal(slid, 0);
+  const d = warm({ ...T }); let slid2 = 0;
+  for (let i = 0; i < 240; i++) if (integrate(d, 1, PHYSICS_DT, 45, { ...T }) & SLIDING) slid2++;
+  assert.ok(slid2 > 0, "the stock gate lets a fast slide count");
+});
+
+test("boostSteer keeps boost firing while steering", () => {
+  const P = { ...T, boostSteer: true };
+  const c = warm(P); c.boost = 0.5;
+  integrate(c, 1, PHYSICS_DT, 45, P);
+  assert.equal(c.boosting, true);
+  const d = warm({ ...T }); d.boost = 0.5;
+  integrate(d, 1, PHYSICS_DT, 45, { ...T });
+  assert.equal(d.boosting, false);
+});
+
+test("multSpeed raises top speed with the chain", () => {
+  const P = { ...T, multSpeed: 0.06 };
+  const c = warm(P, 100); c.mult = 4;
+  for (let i = 0; i < 60; i++) integrate(c, 0, PHYSICS_DT, 45, P);
+  const d = warm(P, 100); d.mult = 1;
+  for (let i = 0; i < 60; i++) integrate(d, 0, PHYSICS_DT, 45, P);
+  assert.ok(!c.off && !d.off, "both still on the road");
+  assert.ok(speedOf(c) > speedOf(d) * 1.10, speedOf(c) + " vs " + speedOf(d));
+});
+
+// Push the car off the road sideways to force WENT_OFF on the next step.
+function shove(c) { const s = track.samples[c.idx]; c.x = s.x + s.nx * 400; c.y = s.y + s.ny * 400; }
+
+test("offFree spares the chain for that many excursions per stage, then cuts it", () => {
+  const P = { ...T, offFree: 1, multOffKeep: 0 };
+  const c = warm(P); c.mult = 3;
+  shove(c);
+  const f1 = integrate(c, 0, PHYSICS_DT, 45, P);
+  assert.ok(f1 & WENT_OFF); assert.ok(f1 & OFF_FREE); assert.equal(c.mult, 3);
+  // back on the road, then off again
+  const s = track.samples[c.idx]; c.x = s.x; c.y = s.y;
+  integrate(c, 0, PHYSICS_DT, 45, P);
+  c.mult = 3; shove(c);
+  const f2 = integrate(c, 0, PHYSICS_DT, 45, P);
+  assert.ok(f2 & WENT_OFF); assert.equal(f2 & OFF_FREE, 0); assert.equal(c.mult, 1);
+  // a new stage (placeCar) resets the counter
+  placeCar(c, track.samples[0]);
+  assert.equal(c.offUsed, 0);
 });

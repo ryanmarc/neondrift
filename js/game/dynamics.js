@@ -11,6 +11,7 @@ import { track, nearest } from "../track/track.js";
 export const BOOST_IGNITED = 1;   // boost started this step
 export const WENT_OFF = 2;        // crossed from on-track to off-track this step
 export const SLIDING = 4;         // drifting on-track fast enough to fill boost
+export const OFF_FREE = 8;        // WENT_OFF, but a run's Insurance (P.offFree) spared the chain this time
 
 /** A fresh car. px/py/pa hold the previous pose for render interpolation. */
 export function createCar() {
@@ -22,6 +23,7 @@ export function createCar() {
     drift: 0, charge: 0, slipSm: 0,
     boost: 0, boosting: false, mult: 1,
     off: false,
+    offUsed: 0,                    // free excursions spent this stage (P.offFree)
   };
 }
 
@@ -31,13 +33,19 @@ export function placeCar(car, s) {
   car.px = car.x; car.py = car.y; car.pa = car.a;
   car.vx = 0; car.vy = 0; car.idx = 0; car.prog = 0; car.lap = 1;
   car.drift = 0; car.charge = 0; car.boost = 0; car.boosting = false; car.mult = 1; car.slipSm = 0; car.off = false;
+  car.offUsed = 0;
 }
 
 /**
  * Advance `car` by dt seconds with steering input inp (-1, 0, 1).
  * Uses the currently loaded track. Returns a bitmask of BOOST_IGNITED,
  * WENT_OFF and SLIDING. `window` is passed through to nearest(); see there.
- * `P` is the physics table, `T` unless a run mode supplies its own.
+ * `P` is the physics table, `T` unless a run mode supplies its own. A run's
+ * table may also carry four optional keys, read with their stock values as
+ * the fallback so the stock table behaves exactly as before: `slideSpeed`
+ * (210, the speed a drift must have to count), `boostSteer` (false, boost
+ * keeps firing while steering), `multSpeed` (0, top speed per ×1 of chain)
+ * and `offFree` (0, excursions per stage that don't cut the chain).
  */
 export function integrate(car, inp, dt, window = 45, P = T) {
   let flags = 0;
@@ -79,11 +87,13 @@ export function integrate(car, inp, dt, window = 45, P = T) {
   // small shoves, which is honest — and it means the meter never holds anything
   // you can't spend.
   const wasBoost = car.boosting;
-  car.boosting = inp === 0 && car.boost > 0 && speed > 140;
+  // A run's Afterburner (P.boostSteer) lets it keep firing through a corner.
+  car.boosting = (inp === 0 || P.boostSteer === true) && car.boost > 0 && speed > 140;
   if (car.boosting && !wasBoost) flags |= BOOST_IGNITED;
   if (car.boosting) car.boost = Math.max(0, car.boost - P.boostDrain * dt);
 
-  const top = (car.boosting ? P.boostSpeed : P.maxSpeed) * (car.off ? 0.52 : 1);
+  // Snowball: top speed climbs with the chain. Stock 0, so the daily race never sees it.
+  const top = (car.boosting ? P.boostSpeed : P.maxSpeed) * (1 + (P.multSpeed ?? 0) * (car.mult - 1)) * (car.off ? 0.52 : 1);
   const acc = car.boosting ? P.boostAccel : P.accel;
   fwd += acc * dt;
   if (fwd > top) fwd = lerp(fwd, top, 1 - Math.exp(-6 * dt));
@@ -129,11 +139,12 @@ export function integrate(car, inp, dt, window = 45, P = T) {
   car.off = near.dist > track.halfW;
   if (car.off && !wasOff) {
     flags |= WENT_OFF;
-    car.mult = 1 + (car.mult - 1) * P.multOffKeep;   // 0 keeps nothing: the daily race's full reset
+    if (car.offUsed < (P.offFree ?? 0)) { car.offUsed++; flags |= OFF_FREE; }   // Insurance: this one is free
+    else car.mult = 1 + (car.mult - 1) * P.multOffKeep;   // 0 keeps nothing: the daily race's full reset
   }
 
   // drifting fills boost
-  const sliding = car.drift > P.driftMin && speed > 210 && !car.off;
+  const sliding = car.drift > P.driftMin && speed > (P.slideSpeed ?? 210) && !car.off;
   if (sliding) {
     flags |= SLIDING;
     car.boost = Math.min(P.boostCap, car.boost + dt * car.drift * (speed / P.maxSpeed) * P.boostFill * car.mult);
