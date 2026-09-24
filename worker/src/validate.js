@@ -16,6 +16,8 @@ export function cleanName(raw) {
 }
 
 export function validSecret(s) { return typeof s === "string" && /^[0-9a-f]{32}$/.test(s); }
+/** A pairing token: the new device's 128-bit collection capability, same shape as a secret. */
+export function validToken(s) { return typeof s === "string" && /^[0-9a-f]{32}$/.test(s); }
 export function validSeed(s) { return typeof s === "string" && s.length >= 1 && s.length <= 64 && /^[\x21-\x7e]+$/.test(s); }
 export function validTrackId(s) { return typeof s === "string" && /^[0-9a-z]{1,8}$/.test(s); }
 export function validTime(t) { return typeof t === "number" && Number.isFinite(t) && t > 0 && t <= 75; }

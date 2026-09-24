@@ -1,14 +1,16 @@
-// Neon Drift leaderboard API. Six routes, JSON in and out, CORS to the game's
+// Neon Drift leaderboard API. Seven routes, JSON in and out, CORS to the game's
 // origin, per-IP rate limits on writes. Times are never trusted: /runs
 // replays the submitted inputs through the game's physics and stores what
-// that produces.
+// that produces. Pairing never hands a secret to whoever types a code: the
+// new device shows the code and collects with a private token; the device
+// that already has the secret is the one that types (see /pair/*).
 
 import { replay, trackFor } from "./replay.js";
 import * as v from "./validate.js";
 import * as db from "./db.js";
 
 const TOP_N = 10;
-const CODE_TTL_MS = 10 * 60 * 1000;
+const PAIR_TTL_MS = 5 * 60 * 1000;   // long enough to walk to the other device; short enough to bound polling
 
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
@@ -22,6 +24,11 @@ async function sha256Hex(s) {
 function randomCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return [...bytes].map(b => v.CODE_ALPHABET[b % v.CODE_ALPHABET.length]).join("");
+}
+
+function randomToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Only origins listed in ALLOWED_ORIGINS get CORS headers. Production lists the
@@ -115,24 +122,36 @@ async function postName(body, env) {
   return json({ ok: true, tag: id.slice(0, 4) });
 }
 
-async function pairStart(body, env) {
-  if (!body || !v.validSecret(body.secret)) return bad("invalid-secret");
-  const now = Date.now(), expires = now + CODE_TTL_MS;
-  await db.purgeCodes(env.DB, now);
+// ---------- pairing (device-authorization shape, as in RFC 8628) ----------
+
+/** The new device: mints a code to show and a token to keep. Needs no secret — that is the point. */
+async function pairStart(env) {
+  const now = Date.now(), expires = now + PAIR_TTL_MS;
+  await db.purgePairings(env.DB, now);
   for (let attempt = 0; attempt < 5; attempt++) {
-    const code = randomCode();
-    try { await db.createCode(env.DB, code, body.secret, expires); return json({ code, expires }); }
-    catch { /* collision: try another */ }
+    const code = randomCode(), token = randomToken();
+    try { await db.createPairing(env.DB, code, token, expires); return json({ code, token, expires }); }
+    catch { /* code collision: try another */ }
   }
   return bad("try-again", 503);
 }
 
-async function pairClaim(body, env) {
+/** The device that has the secret: types the code it sees on the new device. */
+async function pairApprove(body, env) {
   if (!body || !v.validCode(body.code)) return bad("invalid-code");
-  const secret = await db.takeCode(env.DB, body.code, Date.now());
-  if (!secret) return bad("unknown-code", 404);
-  const name = await db.playerName(env.DB, await sha256Hex(secret));
-  return json({ secret, name });
+  if (!v.validSecret(body.secret)) return bad("invalid-secret");
+  const ok = await db.approvePairing(env.DB, body.code, body.secret, Date.now());
+  return ok ? json({ ok: true }) : bad("unknown-code", 404);
+}
+
+/** The new device, on a timer: pending until approved, then the secret exactly once. */
+async function pairPoll(body, env) {
+  if (!body || !v.validToken(body.token)) return bad("invalid-token");
+  const r = await db.collectPairing(env.DB, body.token, Date.now());
+  if (!r) return bad("unknown-token", 404);
+  if (r.status === "pending") return json({ status: "pending" });
+  const name = await db.playerName(env.DB, await sha256Hex(r.secret));
+  return json({ status: "ready", secret: r.secret, name });
 }
 
 export default {
@@ -149,13 +168,20 @@ export default {
       if (request.method === "GET" && url.pathname === "/board") return withCors(() => getBoard(url, env));
       if (request.method === "GET" && url.pathname === "/ghost") return withCors(() => getGhost(url, env));
       if (request.method === "POST") {
-        if (url.pathname === "/pair/claim" && await limited(env.CLAIM_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
+        // Polling is one indexed read every couple of seconds; it has its own
+        // budget so it never competes with, or exhausts, the write limit.
+        if (url.pathname === "/pair/poll") {
+          if (await limited(env.POLL_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
+          return withCors(async () => pairPoll(await readJson(request), env));
+        }
+        // Approving is the only surface where a code is guessed at; it gets the tight limit on top.
+        if (url.pathname === "/pair/approve" && await limited(env.CLAIM_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
         if (await limited(env.POST_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
         const body = await readJson(request);
         if (url.pathname === "/runs") return withCors(() => postRun(body, env));
         if (url.pathname === "/name") return withCors(() => postName(body, env));
-        if (url.pathname === "/pair/start") return withCors(() => pairStart(body, env));
-        if (url.pathname === "/pair/claim") return withCors(() => pairClaim(body, env));
+        if (url.pathname === "/pair/start") return withCors(() => pairStart(env));
+        if (url.pathname === "/pair/approve") return withCors(() => pairApprove(body, env));
       }
       return withCors(() => bad("not-found", 404));
     } catch (err) {

@@ -502,10 +502,21 @@ A Cloudflare Worker with D1. It imports the game's `dynamics.js`, `track.js`
 and `tuning.js` by relative path and verifies every submitted run by replaying
 its recorded inputs; the replayed time is what gets stored. Routes are in
 `worker/src/index.js`: `POST /runs`, `GET /board`, `POST /name`,
-`POST /pair/start`, `POST /pair/claim`, and `GET /ghost` (a stored run's
-recording, for racing a leaderboard ghost). CORS is limited to `ALLOWED_ORIGINS`
+`POST /pair/start`, `POST /pair/approve`, `POST /pair/poll`, and `GET /ghost`
+(a stored run's recording, for racing a leaderboard ghost). CORS is limited to `ALLOWED_ORIGINS`
 in `wrangler.toml`: the GitHub Pages origin in production, localhost only
 under `wrangler dev --env dev`. Writes are rate limited per IP.
+
+**Pairing never hands a secret to whoever types a code.** It is the device-
+authorization shape (RFC 8628): the *new* device calls `/pair/start`, shows
+the six-character code and keeps a private 128-bit token; the device that
+already has the name types the code into `/pair/approve` with its secret; the
+new device collects with `/pair/poll` by token, which deletes the row in the
+same statement (`DELETE … RETURNING`). Guessing a code can only push your
+own secret onto a stranger's device, never pull one. Polling is 2s for the
+first minute then 5s, skipped while the tab is hidden, on its own rate-limit
+binding (`POLL_LIMIT`) so it can't exhaust the write limit. Don't reverse
+this back to "code returns secret" for a simpler UI.
 
 Run it locally: `cd worker && npm install && npm run db:init:local && npm run dev`.
 A game served from localhost talks to it automatically (`API_URL` in

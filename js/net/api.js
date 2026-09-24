@@ -35,5 +35,8 @@ export const fetchBoard = (trackId, playerId) =>
 export const fetchGhost = (trackId, playerId) =>
   call("/ghost?track=" + encodeURIComponent(trackId) + "&player=" + playerId);
 export const postName = (secret, name) => call("/name", { method: "POST", body: { secret, name } });
-export const pairStart = (secret) => call("/pair/start", { method: "POST", body: { secret } });
-export const pairClaim = (code) => call("/pair/claim", { method: "POST", body: { code } });
+// Pairing: the new device starts (gets a code to show and a token to keep) and
+// polls; the device that has the secret approves by sending the code.
+export const pairStart = () => call("/pair/start", { method: "POST", body: {} });
+export const pairApprove = (code, secret) => call("/pair/approve", { method: "POST", body: { code, secret } });
+export const pairPoll = (token) => call("/pair/poll", { method: "POST", body: { token } });

@@ -17,7 +17,7 @@ export const board = {
   rankCap: 100,
   pending: null,      // a PB waiting for a name before it can be posted
   lastSubmit: null,   // { accepted, improved, rank, reason } from the last post
-  pairing: null,      // { code, expires } while a pairing code is showing
+  pairing: null,      // { code, token, expires, status: waiting | expired } while this device is being paired
   rival: null,        // { id, name, tag, time, status: loading | ready | failed } — chosen leaderboard ghost
 };
 
@@ -117,24 +117,51 @@ export async function setPlayerName(name) {
   return true;
 }
 
+// ---------- device pairing ----------
+//
+// This device is the *new* one: it shows a code and keeps a private token.
+// The device that already has the secret types the code (approvePairingCode),
+// and this one collects the secret by polling with the token. A code on its
+// own retrieves nothing, so guessing codes gains an attacker nothing.
+
+/** Seconds between polls: quick while the person is likely walking to the other device, slower after. */
+export function pollDelay(elapsedMs) { return elapsedMs < 60_000 ? 2000 : 5000; }
+
+/** Start pairing this device: fetch a code to show and begin polling for the secret. */
 export async function startPairing() {
-  const res = await api.pairStart(identity.ensureSecret());
+  const res = await api.pairStart();
   if (!res || res.error) return false;
-  board.pairing = { code: res.code, expires: res.expires }; changed();
+  const pairing = { code: res.code, token: res.token, expires: res.expires, status: "waiting" };
+  board.pairing = pairing; changed();
+  const startedAt = Date.now();
+  const schedule = () => setTimeout(poll, pollDelay(Date.now() - startedAt));
+  async function poll() {
+    if (board.pairing !== pairing || pairing.status !== "waiting") return;   // cleared, replaced or ended
+    if (typeof document !== "undefined" && document.hidden) { schedule(); return; }   // nobody is looking: save the request
+    const r = await api.pairPoll(pairing.token);
+    if (board.pairing !== pairing) return;
+    if (r && r.status === "ready") {
+      identity.setSecret(r.secret);
+      if (r.name) identity.setName(r.name);
+      board.pairing = null; changed();
+      await refreshBoard();
+      return;
+    }
+    if ((r && r.error) || Date.now() > pairing.expires) { pairing.status = "expired"; changed(); return; }
+    schedule();   // pending, or a network blip: try again
+  }
+  schedule();
   return true;
 }
 
 export function clearPairing() { board.pairing = null; changed(); }
 
-/** Adopt another device's identity from its code. Resolves false if the code is bad. */
-export async function claimPairingCode(code) {
-  const res = await api.pairClaim(code.trim().toUpperCase());
-  if (!res || res.error) return false;
-  identity.setSecret(res.secret);
-  if (res.name) identity.setName(res.name);
-  changed();
-  await refreshBoard();
-  return true;
+/** This device has the secret: approve the code showing on the other device. Resolves false if refused. */
+export async function approvePairingCode(code) {
+  const secret = identity.getSecret();
+  if (!secret) return false;
+  const res = await api.pairApprove(code.trim().toUpperCase(), secret);
+  return !!res && !res.error;
 }
 
 on("track-loaded", async () => {

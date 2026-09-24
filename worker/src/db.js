@@ -63,19 +63,39 @@ export async function topRuns(db, trackId, n) {
   return results;
 }
 
-/** Drop expired codes. Range scan on the expires index: only dead rows are touched. */
-export async function purgeCodes(db, now) {
-  await db.prepare("DELETE FROM pair_codes WHERE expires < ?1").bind(now).run();
+/** Drop expired pairings. Range scan on the expires index: only dead rows are touched. */
+export async function purgePairings(db, now) {
+  await db.prepare("DELETE FROM pairings WHERE expires < ?1").bind(now).run();
 }
 
-export async function createCode(db, code, secret, expires) {
-  await db.prepare("INSERT INTO pair_codes (code, secret, expires) VALUES (?1, ?2, ?3)").bind(code, secret, expires).run();
+/** A new device's pairing: its typeable code and its private token, no secret yet. Throws on a code collision. */
+export async function createPairing(db, code, token, expires) {
+  await db.prepare("INSERT INTO pairings (code, token, expires) VALUES (?1, ?2, ?3)").bind(code, token, expires).run();
 }
 
-/** Consume a code: returns the secret if it exists and hasn't expired, deleting it either way. */
-export async function takeCode(db, code, now) {
-  const row = await db.prepare("SELECT secret, expires FROM pair_codes WHERE code = ?1").bind(code).first();
+/**
+ * The device that has the secret approves a code. One conditional UPDATE, so
+ * only a live, not-yet-approved code takes it and a second approval can't
+ * swap the secret out. Returns whether a row was filled.
+ */
+export async function approvePairing(db, code, secret, now) {
+  const r = await db.prepare(
+    "UPDATE pairings SET secret = ?2 WHERE code = ?1 AND secret IS NULL AND expires > ?3"
+  ).bind(code, secret, now).run();
+  return r.meta.changes > 0;
+}
+
+/**
+ * The new device collects by token. "pending" while unapproved; once approved
+ * the row is deleted in the same statement that reads it (DELETE … RETURNING),
+ * so delivery happens exactly once. null when there is no live row.
+ */
+export async function collectPairing(db, token, now) {
+  const row = await db.prepare("SELECT secret FROM pairings WHERE token = ?1 AND expires > ?2").bind(token, now).first();
   if (!row) return null;
-  await db.prepare("DELETE FROM pair_codes WHERE code = ?1").bind(code).run();
-  return row.expires > now ? row.secret : null;
+  if (row.secret == null) return { status: "pending" };
+  const taken = await db.prepare(
+    "DELETE FROM pairings WHERE token = ?1 AND secret IS NOT NULL RETURNING secret"
+  ).bind(token).first();
+  return taken ? { status: "ready", secret: taken.secret } : null;
 }

@@ -17,9 +17,15 @@ CREATE TABLE IF NOT EXISTS runs (
 -- row of the track, and D1 bills every row touched.
 CREATE INDEX IF NOT EXISTS runs_track_time_created ON runs (track_id, time, created);
 DROP INDEX IF EXISTS runs_track_time;
-CREATE TABLE IF NOT EXISTS pair_codes (
+-- Device pairing. The new device shows `code` and keeps `token`; the device
+-- that has the secret types the code, which fills `secret`; the new device
+-- collects it by token, which deletes the row. Rows are minutes-lived.
+CREATE TABLE IF NOT EXISTS pairings (
   code TEXT PRIMARY KEY,
-  secret TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  secret TEXT,
   expires INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS pair_codes_expires ON pair_codes (expires);
+CREATE INDEX IF NOT EXISTS pairings_expires ON pairings (expires);
+-- The earlier one-way flow (code returned the secret to whoever typed it).
+DROP TABLE IF EXISTS pair_codes;

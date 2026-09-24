@@ -29,3 +29,12 @@ name = "CLAIM_LIMIT"
 type = "ratelimit"
 namespace_id = "1002"
 simple = { limit = 5, period = 60 }
+
+# The new device polls /pair/poll every 2s (5s after the first minute) while
+# its code is showing; 40/min leaves headroom over that without letting a
+# script hammer the table.
+[[unsafe.bindings]]
+name = "POLL_LIMIT"
+type = "ratelimit"
+namespace_id = "1003"
+simple = { limit = 40, period = 60 }

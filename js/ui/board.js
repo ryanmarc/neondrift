@@ -4,7 +4,7 @@
 
 import { $ } from "../core/dom.js";
 import { on } from "../core/events.js";
-import { board, submitPending, dismissPending, setPlayerName, startPairing, clearPairing, claimPairingCode, chooseRival, challengeUrl } from "../net/leaderboard.js";
+import { board, submitPending, dismissPending, setPlayerName, startPairing, clearPairing, approvePairingCode, chooseRival, challengeUrl } from "../net/leaderboard.js";
 import * as identity from "../net/identity.js";
 import { track } from "../track/track.js";
 import { fmt } from "./hud.js";
@@ -12,7 +12,7 @@ import { fmt } from "./hud.js";
 const $board = $("board"), $list = $("boardlist"), $me = $("boardme"), $status = $("boardstatus");
 const $devices = $("devices"), $challenge = $("challenge");
 const $namerow = $("namerow"), $namehead = $("namehead"), $namebox = $("namebox"), $post = $("postname"), $skip = $("skipname");
-const $pairstart = $("pairstart"), $pairclaim = $("pairclaim"), $rename = $("rename"), $pairbox = $("pairbox");
+const $pairstart = $("pairstart"), $pairapprove = $("pairapprove"), $rename = $("rename"), $pairbox = $("pairbox");
 
 // The identity can appear (first post) or change (pairing) at any time, so
 // every render re-checks the tag and re-renders if it moved.
@@ -64,11 +64,14 @@ function render() {
 
   $rename.style.display = identity.getName() ? "" : "none";
   $challenge.style.display = board.status === "ready" && board.me ? "" : "none";   // needs a posted time to point at
-  $pairstart.style.display = identity.getSecret() ? "" : "none";
+  $pairapprove.style.display = identity.getName() ? "" : "none";   // only a device with a name has something to hand over
 
-  if (board.pairing) {
+  if (board.pairing && board.pairing.status === "expired") {
+    $pairbox.innerHTML = '<div>That code expired. <button type="button" class="link" id="pairdone">try again</button></div>';
+    $("pairdone").addEventListener("click", () => { clearPairing(); startPairing(); });
+  } else if (board.pairing) {
     const mins = Math.max(0, Math.ceil((board.pairing.expires - Date.now()) / 60000));
-    $pairbox.innerHTML = '<div>On the other device, choose "Enter a code":</div><div class="code">' + esc(board.pairing.code) + "</div><div>good for " + mins + ' min · <button type="button" class="link" id="pairdone">done</button></div>';
+    $pairbox.innerHTML = '<div>On the device that has your name, choose "Add a device" and enter:</div><div class="code">' + esc(board.pairing.code) + "</div><div>waiting… good for " + mins + ' min · <button type="button" class="link" id="pairdone">cancel</button></div>';
     $("pairdone").addEventListener("click", clearPairing);
   } else if (!$pairbox.dataset.mode) {
     $pairbox.innerHTML = "";
@@ -145,19 +148,26 @@ $rename.addEventListener("click", e => {
 });
 
 // ---------- pairing ----------
+//
+// "Use my name from another device" is tapped on the *new* device: it shows a
+// code and waits. "Add a device" is tapped on the device that already has the
+// name: it types that code. The secret only ever travels to the device that
+// showed the code, never to whoever typed one.
 
 $pairstart.addEventListener("click", async e => {
   e.stopPropagation();
+  $pairbox.dataset.mode = "";
   if (!(await startPairing())) $status.textContent = "couldn't get a code right now";
 });
-$pairclaim.addEventListener("click", e => {
+$pairapprove.addEventListener("click", e => {
   e.stopPropagation();
-  $pairbox.dataset.mode = "claim";
-  $pairbox.innerHTML = '<div>Code from your other device:</div><div><input id="codebox" maxlength="6" autocomplete="off" spellcheck="false"> <button type="button" id="codego" class="link">use it</button></div>';
+  clearPairing();
+  $pairbox.dataset.mode = "approve";
+  $pairbox.innerHTML = '<div>Code showing on the new device:</div><div><input id="codebox" maxlength="6" autocomplete="off" spellcheck="false"> <button type="button" id="codego" class="link">add it</button></div>';
   const $code = $("codebox");
   const go = async () => {
-    const ok = await claimPairingCode($code.value);
-    if (ok) { $pairbox.dataset.mode = ""; $pairbox.innerHTML = ""; render(); }
+    const ok = await approvePairingCode($code.value);
+    if (ok) { $pairbox.dataset.mode = ""; $pairbox.innerHTML = "<div>Done — the new device has your name now.</div>"; }
     else $status.textContent = "that code didn't work";
   };
   $code.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Enter") go(); });
