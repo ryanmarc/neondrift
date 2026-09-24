@@ -132,13 +132,26 @@ reaches zero. `TIMER` in
 refill gain, and the low-clock and Skip amounts aren't reproduced here.
 
 Between stages you pick one of three mods (plus an always-present Skip, worth
-a few seconds and nothing else). A mod is a trade — some gain, some cost —
-folded into a *build*: a copy of `T` plus the run's own knobs (road width,
-timer multipliers), applied by `buildFrom(picks)` in `js/run/mods.js`; that
-file is the catalogue and the source of every percentage. Offers are seeded
-from the day and stage (`offerFor` in `js/run/offer.js`), so everyone racing
-the same day sees the same choices in the same order; a mod already held is
-weighted to come up again, so a build converges rather than staying scattershot.
+a few seconds and nothing else). The catalogue is 30 cards in `js/run/mods.js`,
+each with a `kind`: car, character, clock, road, rules or pure. A car card
+changes a handling knob by enough to feel in the first corner and pays for it
+in a *different* currency — steering rate, a ceiling, heavier mistakes, less
+information, a longer lap, a lump sum now, a threshold — never the drain rate.
+A character card is a different car (Fishtail, Ice, Boat, Twitch, Rocket,
+Glide, Afterburner, Snowball) and carries no cost line: its trade is emergent
+from the physics. Pure cards (Kickstart, Insurance, Breather) have no cost and
+half the offer weight. Picks fold into a *build* — a copy of `T` plus the run's
+own knobs — via `buildFrom(picks)`; that file is the source of every
+percentage. Four keys on the build's `T` (`slideSpeed`, `boostSteer`,
+`multSpeed`, `offFree`) are read by `integrate()` with stock fallbacks, so `T`
+itself never gains them and the line cache key is unchanged. Offers are seeded
+from the day and stage (`offerFor` in `js/run/offer.js`): slot one is always a
+car or character card, held mods and unheld character cards are weighted
+double, pure cards half. `test/mod-feel.test.mjs` is the bar: every car and
+character card at level 1 must move a handling metric by 15% against the base
+build, measured by driving a fixed stage with the bootstrap controller (Long
+tank and Snowball are measured with a full meter / a carried chain, the state
+they act in).
 
 **The track ramps with the stage.** Each stage asks the generator for a
 minimum number of *corners* — the drift guides' count, a stretch of smoothed
@@ -152,6 +165,15 @@ harmonics, and 11 is where it starts failing; across 280 stage seeds the
 fallback never fires and the median climbs from 6 to 10. The raw
 direction-change count (`flips`) was the first candidate and is useless as a
 ramp: it counts gentle wiggles, so most tracks already have eight.
+
+**Track difficulty was measured before becoming a cost.** Across 600 seeds the
+tightest radius already sits within 30px of the 185 floor (asking for tighter
+misses seeds and isn't felt), opposing-corner gaps are already under the
+traction-recovery time by stage 8 (the ramp delivers transitions), and long
+corners can't be asked for reliably. Lap length is the one track cost (Wide
+road): the accepted layout is rebuilt at a larger radius after the search
+(`shape.lapScale`), which never fails and makes every corner gentler by the
+same factor. Scaling before the search lost seeds even at ×1.1.
 
 Score is stages cleared, then progress into the stage that ended it — not
 time. Bests are local only, per day and all-time, in `localStorage`; there is
@@ -320,6 +342,13 @@ Conventions:
   daily track with `loadTrack(day)` on abandon. A run's stages have no ghost
   either way: `loadStage` calls `unloadGhost()` to clear the daily one without
   touching storage, and `abandon`'s `loadTrack` brings it back.
+- **A run's fallback ranks drivable first.** When a shape asks for corners,
+  `buildTrack` prefers a fallback that clears the radius floor over one with
+  more corners; two stage seeds in 720 used to ship an 85px corner. The
+  default path's ranking is untouched.
+- **`camera.spanScale` and `car.offUsed` belong to the run.** The camera
+  span multiplier is set on stage load and pick, reset to 1 on leaving; the
+  free-excursion counter resets in `placeCar`, so Insurance is per stage.
 - **Skip is always pickable, even on an empty offer.** `pick()`'s offer check
   only applies to a mod id; a fully-capped catalogue (every mod held to its
   max) still leaves Skip standing, so a run can never strand a player with no
@@ -348,6 +377,7 @@ Conventions:
 | `offDrag` | Drag while off-track. |
 | `multRise` / `multFall` / `multCap` | Chain multiplier build rate while sliding, decay rate, ceiling. |
 | `multOffKeep` | Fraction of the chain above ×1 that survives leaving the road. 0 in the daily race (a full reset); a run's build uses 0.5, and its Off-road tax mod 1. |
+| `slideSpeed` / `boostSteer` / `multSpeed` / `offFree` | Not in `T`: optional keys a run's build sets, read by `integrate()` with stock fallbacks (210, false, 0, 0). Slide speed gate; boost fires while steering; top speed per ×1 of chain; free excursions per stage. |
 | `zoomRange` / `zoomLag` | How far the view pulls back at speed, and seconds to follow a speed change. Set `zoomRange` to 0 to lock the zoom. |
 
 ### `CAM` — camera feel
