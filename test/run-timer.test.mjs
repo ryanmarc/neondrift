@@ -20,7 +20,7 @@ test("drains one second per second on stage 1, ramped on later stages", () => {
   assert.ok(drainRate(TIMER.knee, buildFrom([])) < TIMER.drainMax, "a knee, not a cliff, in the early stages");
   assert.ok(drainRate(9, buildFrom([])) > drainRate(8, buildFrom([])), "it rises every stage");
   assert.ok(drainRate(60, buildFrom([])) > 5, "and without bound, so every build ends");
-  close(drainRate(1, buildFrom(["turbo"])), 1.08);
+  close(drainRate(1, buildFrom(["slow"])), 0.85);
 });
 
 test("refills only while SLIDING and only above the refill floor", () => {
@@ -49,7 +49,7 @@ test("caps at cap × build.cap", () => {
   const deep = fresh({ build: buildFrom(["deep"]), timer: TIMER.cap });
   second(deep, SLIDING, carAt(4));
   assert.ok(deep.timer > TIMER.cap);
-  close(capFor(deep.build), TIMER.cap * (1 + 6 / 30));
+  close(capFor(deep.build), TIMER.cap + 8);
 });
 
 test("the off-road tax takes seconds on the step the car leaves the road", () => {
