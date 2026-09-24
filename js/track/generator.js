@@ -83,11 +83,17 @@ export function cornerCount(S) {
  * corners when asked — the run's track ramp). Falls back to the best rejected
  * candidate. With no shape the search is exactly the daily race's: the same
  * rng draws, the same first acceptable layout, so every stored track id holds.
+ * shape.lapScale (default 1) rebuilds the accepted layout at a larger radius.
  */
 export function buildTrack(rng, shape = {}) {
-  const minR = shape.minR ?? 185, corners = shape.corners ?? 0;
+  const minR = shape.minR ?? 185, corners = shape.corners ?? 0, lapScale = shape.lapScale ?? 1;
   const R0 = 1080 + rng() * 470;
-  let fallback = null, fallbackScore = -1, fallbackOk = false;
+  // A run's Wide road lengthens the lap by scaling the accepted layout, not the
+  // search: scaling R0 before the search loses seeds (gentler curvature drops
+  // corners under the count threshold), while scaling after grows every radius
+  // by the same factor and can't fail. Measured across 480 stage seeds.
+  const finish = (t, amps) => lapScale === 1 ? t : trackFromAmps(R0 * lapScale, amps);
+  let fallback = null, fallbackAmps = null, fallbackScore = -1, fallbackOk = false;
   for (let attempt = 0; attempt < 24; attempt++) {
     const pool = [2, 3, 4, 5, 6, 7];
     for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
@@ -102,7 +108,7 @@ export function buildTrack(rng, shape = {}) {
       const amps = base.map(h => ({ k: h.k, a: h.a * scale * Math.pow(scale < 1 ? 0.95 : 1, Math.max(0, h.k - 4) * shrink), p: h.p }));
       const t = trackFromAmps(R0, amps);
       const score = corners ? cornerCount(t.S) : t.flips;   // what the fallback ranks by
-      if (t.minR > minR && t.flips >= 4 && (!corners || score >= corners)) return t;
+      if (t.minR > minR && t.flips >= 4 && (!corners || score >= corners)) return finish(t, amps);
       // With no shape the daily race's ranking is kept exactly. A run's shape
       // ranks a candidate that clears the radius floor above any that doesn't:
       // the old rule kept a first candidate with a 90px corner (inside the
@@ -111,9 +117,9 @@ export function buildTrack(rng, shape = {}) {
       const better = !fallback || (corners
         ? (ok && !fallbackOk) || (ok === fallbackOk && (score > fallbackScore || (score === fallbackScore && t.minR > fallback.minR)))
         : (score > fallbackScore && t.minR > 170));
-      if (better) { fallback = t; fallbackScore = score; fallbackOk = ok; }
+      if (better) { fallback = t; fallbackAmps = amps; fallbackScore = score; fallbackOk = ok; }
       scale *= 0.90;
     }
   }
-  return fallback;
+  return finish(fallback, fallbackAmps);
 }

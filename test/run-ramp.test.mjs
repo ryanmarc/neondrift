@@ -12,6 +12,7 @@ const { buildTrack, cornerCount } = await import(new URL("track/generator.js", r
 const { buildGuides } = await import(new URL("track/guides.js", root));
 const { track, loadTrackGeometry } = await import(new URL("track/track.js", root));
 const { mulberry32, hashStr } = await import(new URL("core/random.js", root));
+const { STEP } = await import(new URL("config/tuning.js", root));
 
 const rngFor = seed => mulberry32(hashStr(seed));
 
@@ -59,4 +60,15 @@ test("the fallback never returns a corner tighter than the road: two seeds that 
     const t = buildTrack(rngFor(seed), stageShape(12));
     assert.ok(t.minR > 185, seed + " minR " + t.minR.toFixed(0));
   }
+});
+
+test("lapScale scales the accepted track after the search: same shape, every radius larger", () => {
+  const plain = buildTrack(rngFor("2026-09-24#run4"), stageShape(4));
+  const long = buildTrack(rngFor("2026-09-24#run4"), { ...stageShape(4), lapScale: 1.2 });
+  assert.ok(Math.abs(long.length / plain.length - 1.2) < 0.01, "length " + long.length / plain.length);
+  assert.ok(Math.abs(long.minR / plain.minR - 1.2) < 0.02, "minR " + long.minR / plain.minR);
+  assert.ok(Math.abs(long.S.length / plain.S.length - 1.2) < 0.01, "sample count keeps the " + STEP + "px spacing");
+  const one = buildTrack(rngFor("2026-09-24#run4"), { ...stageShape(4), lapScale: 1 });
+  assert.equal(one.S.length, plain.S.length);
+  assert.equal(one.S[100].x, plain.S[100].x);
 });

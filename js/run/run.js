@@ -32,7 +32,7 @@ export function loadBests(day) {
 // track-loaded event, so the leaderboard never fetches a board for a stage and
 // the HUD never rewrites the URL.
 function loadStage(n) {
-  loadTrackGeometry(stageSeed(run.day, n), stageShape(n));
+  loadTrackGeometry(stageSeed(run.day, n), { ...stageShape(n), lapScale: run.build.lapScale });
   track.halfW = HALF_W * run.build.halfW;
   unloadGhost();
   resetRace(track.samples[0]);
