@@ -262,6 +262,8 @@ body.run #clearghost{display:none!important}
   padding:12px 14px;color:var(--paper);font-family:inherit;cursor:pointer;
 }
 .card:active{background:rgba(47,227,255,.14);border-color:var(--ice)}
+/* gamepad focus ring: drawn only once a pad has been used (ui/controls.js) */
+.padfocus{outline:2px solid var(--ice);outline-offset:3px;box-shadow:0 0 14px rgba(47,227,255,.45)}
 .card .cname{font-size:16px;font-weight:700;letter-spacing:.04em}
 .card .pips{margin-left:8px;color:var(--amber);font-size:12px;letter-spacing:.1em}
 .card .cgain{font-size:13px;opacity:.85}

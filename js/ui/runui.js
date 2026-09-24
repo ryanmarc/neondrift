@@ -23,7 +23,7 @@ function card(id) {
   const m = id === SKIP.id ? SKIP : byId.get(id);
   const n = held(run.picks, id);
   const pips = m.max > 1 ? '<span class="pips">' + "●".repeat(n) + "○".repeat(m.max - n) + "</span>" : "";
-  return '<button type="button" class="card' + (id === SKIP.id ? " skip" : "") + '" data-id="' + esc(id) + '">'
+  return '<button type="button" class="card' + (id === SKIP.id ? " skip" : "") + '" data-id="' + esc(id) + '" data-pad>'
     + '<span class="cname">' + esc(m.name) + pips + "</span>"
     + '<span class="cgain">' + esc(m.gain) + "</span>"
     + (m.cost ? '<span class="ccost">' + esc(m.cost) + "</span>" : "")

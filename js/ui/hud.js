@@ -154,6 +154,8 @@ function setInputMode(mode) {
   if (mode) inputMode = mode;
   $rule.innerHTML = inputMode === "pointer"
     ? 'Hold <b>either side</b> of the screen to turn.'
+    : inputMode === "pad"
+    ? 'Hold the <b>stick or d-pad</b> left or right to turn. In menus, <b>A</b> picks and <b>LB</b> / <b>RB</b> change the day.'
     : 'Hold the <b>left or right arrow key</b> to turn.';
 }
 

@@ -11,6 +11,8 @@ import { track } from "../track/track.js";
 import { isDateSeed, todayUtc } from "../config/params.js";
 import { run } from "../run/state.js";
 import { startRun } from "../run/run.js";
+import { padState, risingEdges, firstPad, stepIndex } from "../input/gamepad.js";
+import { emit } from "../core/events.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
@@ -57,3 +59,43 @@ $cam.addEventListener("click", e => {
   e.stopPropagation(); camera.chase = !camera.chase;
   $cam.textContent = "Camera: " + (camera.chase ? "chase" : "fixed");
 });
+
+// ---------- gamepad menus ----------
+//
+// Steering is polled by input.js; this is the rest of the pad. A focus ring
+// moves between the visible screen's primary buttons (those marked data-pad:
+// the two title buttons, race again, the mod cards and Skip, the run-over
+// pair), A presses the focused one, B is the R key, LB/RB are the day arrows.
+// Everything goes through the buttons' own click handlers, so the audio
+// unlock, the line-computing guard and the run's Skip rule apply unchanged.
+// Secondary links (rename, pairing, toggles) stay mouse-only on purpose:
+// putting them in the ring would make the race button a five-press trip.
+// The ring is only drawn once the pad has actually been used, so mouse and
+// touch players never see it.
+const $overlay = $("overlay");
+let padPrev = padState(null), padEl = null, padUsed = false;
+
+const padTargets = () =>
+  [...$overlay.querySelectorAll("[data-pad]")].filter(el => !el.disabled && el.getClientRects().length > 0);
+
+function pollPad() {
+  const gp = navigator.getGamepads ? firstPad(navigator.getGamepads()) : null;
+  const now = padState(gp), e = risingEdges(padPrev, now);
+  padPrev = now;
+  if (!gp) return;
+  const step = (e.right || e.down) ? 1 : (e.left || e.up) ? -1 : 0;
+  if ((step || e.a) && !padUsed) { padUsed = true; emit("input-mode", "pad"); }   // the title hint switches to pad wording
+  const list = padTargets();
+  // a screen change drops the focused button out of the list: restart at the first one
+  let i = Math.max(0, list.indexOf(padEl));
+  if (step) i = stepIndex(i, list.length, step);
+  const next = list[i] || null;
+  if (padEl && padEl !== next) padEl.classList.remove("padfocus");   // even if it's now hidden
+  padEl = next;
+  if (padEl) padEl.classList.toggle("padfocus", padUsed);
+  if (e.a && padEl) padEl.click();
+  if (e.b && canStart()) restart();
+  if (e.lb) $("dayprev").click();
+  if (e.rb) $("daynext").click();
+}
+setInterval(pollPad, 1000 / 60);

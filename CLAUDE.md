@@ -64,7 +64,12 @@ relatively, or inline it as a `data:` URI.
 
 ## Game mechanics
 
-- **One input.** Hold either screen half (or left/right arrow) to turn. That's it.
+- **One input.** Hold either screen half, a left/right arrow key, or a
+  gamepad's stick or d-pad to turn. That's it. The stick is read as -1/0/1
+  past a deadzone, never analog: any nonzero input breaks traction and forbids
+  boost at the same rate, and the leaderboard's validator only replays those
+  three values, so an analog steer would be both a different mechanic and an
+  unpostable run.
 - **Holding breaks traction.** `chargeUp` seconds of holding drops the lateral
   grip ceiling from `gripMax` to `gripSlide` and the back steps out. Releasing
   restores the ceiling over `chargeDown`, but the sideways momentum already in
@@ -193,7 +198,8 @@ js/run/     mods.js     the mod catalogue; buildFrom(picks) folds picks into a b
             stages.js   stageSeed, stageShape (the track ramp), beats (score order), parseBest, storage keys
             state.js    the mutable `run` object (leaf, so the HUD can read it)
             run.js      startRun, pick, restart, abandon; the run's rules object; loadStage
-js/input/   input.js    steer() from pointer halves + arrow keys; emits input-mode
+js/input/   input.js    steer() from pointer halves + arrow keys + gamepad; emits input-mode
+            gamepad.js  pure: padState(gp) → digital x/y + A/B/LB/RB, risingEdges, firstPad, stepIndex
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
@@ -425,6 +431,25 @@ Control hints adapt via `matchMedia("(pointer: coarse)")`, then correct
 themselves the moment the player actually uses a key or touches the screen.
 Deliberately not user-agent sniffing — that gets touchscreen laptops and
 keyboard tablets wrong.
+
+## Gamepad
+
+Standard-mapping pads work without configuration. The Gamepad API has no
+events for sticks, so it is polled: `steer()` reads the first connected pad
+every physics step (a cheap snapshot, and the only place steering is read),
+and `ui/controls.js` polls at 60Hz for the menus. A focus ring
+(`.padfocus`) moves between the visible screen's primary buttons — those
+marked `data-pad`: the two title buttons, race again, the mod cards and
+Skip, the run-over pair — with the stick or d-pad in any direction; A
+presses the focused one, B is the R key, LB/RB are the day arrows. Every
+action goes through the button's own click handler, so the audio unlock,
+the line-computing guard and the run's Skip rule apply unchanged. The ring
+is drawn only once the pad has been used, so mouse and touch players never
+see it; secondary links (rename, pairing, toggles, clear ghost) stay
+mouse-only so the race button is never a five-press trip. Chrome and Safari
+hide a pad until a button is pressed, which doubles as the handshake.
+`test/gamepad.test.mjs` covers the pure reading; the DOM half was checked
+by stubbing `navigator.getGamepads`.
 
 ## localStorage keys
 
