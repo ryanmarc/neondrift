@@ -227,7 +227,8 @@ js/render/  camera.js   `camera`, resetCamera, updateCamera
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
             sfx.js      effects: update(), engineUpdate(); subscribes to game events; re-exports the context API
             engine.js   the engine: stepEngine(model, input, dt, P) is pure (gears, revs, load); createEngine(ctx, bus) builds the nodes
-            music.js    synthesized synthwave loop; update(live, boosting) picks the mix
+            music.js    the sequencer: plays a composed song on the audio clock; update(live, boosting) picks the mix
+            compose.js  compose(seed) → song: pure, seeded; the pools, the mood, advance() for the bar-line swap
 js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
             api.js      fetch wrappers for the leaderboard API; every failure resolves to null
             leaderboard.js `board` state; posts runs that beat your posted time; rename; pairing; challenge links; emits board-updated, challenge
@@ -291,12 +292,20 @@ Conventions:
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
   updated via `setTargetAtTime`. Per-frame node creation causes crackling.
-- **Music never restarts; the race changes its mix.** `audio/music.js` keeps
-  one sequencer running from the first tap and ramps gains and a lowpass
-  between menu / race / boost states. Notes are scheduled 1.5s ahead on the
-  audio clock from a 250ms timer — far enough that a background tab's 1Hz
-  timer throttling can't starve it; nodes are made per note, not per frame. Kick
-  and bass stay above ~140Hz for the same phone-speaker reason as the boost thump.
+- **Music never restarts; the track changes the tune, the race changes its mix.**
+  `audio/music.js` keeps one sequencer running from the first tap and ramps
+  gains and a lowpass between menu / race / boost states. The tune itself is
+  composed per track by `audio/compose.js` from `track.seed` (not the geometry
+  id: Wide road rebuilds a stage's geometry mid-run and the tune must not
+  flip with it) on the `geometry-loaded` event, which `loadTrackGeometry`
+  emits for the daily track and every run stage alike. A new song is parked
+  as pending and taken by `advance()` on the next bar line, so the day browser
+  and a run's stage changes land as a bar change with the drums running
+  through it. Notes are scheduled 1.5s ahead on the audio clock from a 250ms
+  timer — far enough that a background tab's 1Hz timer throttling can't
+  starve it; nodes are made per note, not per frame. Every chord root is
+  voiced into MIDI 50..61, so kick and bass stay above ~140Hz for the same
+  phone-speaker reason as the boost thump.
 - **A run is posted when it beats your posted time, not your local ghost.**
   The two can differ (a best set before naming yourself, or offline). With no
   board loaded the local personal-best rule applies. The server still only
@@ -543,6 +552,17 @@ Wrap every read in try/catch and render correctly when storage is empty.
   harmonic plus a low scrubbing roar, with an LFO wavering the centre frequency.
   Dead-steady pitch is the clearest tell that a sound is synthetic. A wide, low-Q
   bandpass is just filtered noise and sounds like wind.
+- **The music is a grammar over pools, not a fixed tune and not free rules.**
+  One hand-written loop was the same on every track. Functional-harmony rules
+  were considered and rejected: more variety, far more listening to tune, and
+  every tuning pass changes every track. `compose.js` keeps the composed
+  *shape* (four phrases, the turn, the lead, the fills) and draws the content
+  from pools conditioned on a mood vector drawn first — drawing the parts
+  independently gave random mixtures. Dorian's own vi is diminished, so its
+  VI chord borrows aeolian's; minor-V is aeolian with a major dominant. Lead
+  notes may be chord tones outside the scale for exactly those two chords.
+  `test/compose.test.mjs` checks the register, range and phrase rules across
+  500 seeds; change a pool there and the test tells you what broke.
 - **Swept filters read as motion; static filters read as noise.** The boost burst
   sweeps its bandpass 2600→700Hz, which sounds like air moving past. The same
   noise through a fixed highpass sounded like rasp.
