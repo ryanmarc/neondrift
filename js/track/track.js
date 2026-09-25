@@ -2,6 +2,7 @@
 
 import { clamp } from "../core/math.js";
 import { mulberry32, hashStr } from "../core/random.js";
+import { emit } from "../core/events.js";
 import { buildTrack } from "./generator.js";
 import { HALF_W } from "../config/tuning.js";
 
@@ -27,6 +28,9 @@ export function loadTrackGeometry(seed, shape) {
   track.length = built.length;
   track.halfW = HALF_W;
   track.id = hashTrack(built.S);
+  // Every geometry load — the daily track and each run stage — passes through
+  // here, so this is the one announcement the music needs to follow the track.
+  emit("geometry-loaded", { seed, id: track.id });
 }
 
 // Identify the track by its actual shape, so a ghost is only ever replayed on the
