@@ -74,3 +74,36 @@ test("voicing follows brightness and stays in the kit", () => {
     assert.ok([2, 4].includes(s.mood.leadPhrases[s.mood.leadPhrases.length - 1]) && s.mood.leadPhrases.includes(4), seed);
   }
 });
+
+test("500 seeds: figures, bass, hats follow the mood", () => {
+  const { FIGURES, BASS_PUSH } = C;
+  assert.deepEqual(BASS_PUSH, [0, 3, 6, 8, 11, 14]);
+  const shapes = Object.values(FIGURES).map(f => f.join());
+  for (const seed of SEEDS) {
+    const s = compose(seed), m = s.mood;
+    s.bars.forEach((b, i) => {
+      const p = Math.floor(i / 4);
+      assert.equal(b.fig.length, 8, seed);
+      assert.equal(b.fig.filter(x => x === -1).length <= 1, true, `${seed} bar ${i} more than one rest`);
+      for (const x of b.fig) assert.ok(x === -1 || (x >= 0 && x <= 5), `${seed} bar ${i} slot ${x}`);
+      assert.equal(b.arpEighths, m.density < 0.4 && (p === 0 || p === 2), `${seed} bar ${i} arpEighths`);
+      assert.ok([0, 1, 2].includes(b.bass), seed);
+      if (p === 0) assert.equal(b.bass, 0, `${seed} phrase 1 bass`);
+      assert.equal(b.open, m.density > 0.7 && (p === 1 || p === 3), `${seed} bar ${i} open`);
+    });
+    // one figure per phrase; phrase 4 reuses phrase 2's
+    for (let p = 0; p < 4; p++) for (let k = 1; k < 4; k++) assert.deepEqual(s.bars[p * 4 + k].fig, s.bars[p * 4].fig, seed);
+    assert.deepEqual(s.bars[12].fig, s.bars[4].fig, seed);
+    // a figure is a pool figure with at most one swap and one rest
+    for (const p of [0, 4, 8]) {
+      const f = s.bars[p].fig;
+      const diff = shapes.map(sh => sh.split(",").map(Number)).map(base => f.filter((x, j) => x !== base[j]).length);
+      assert.ok(Math.min(...diff) <= 3, `${seed} bar ${p} figure ${f} is not from the pool`);
+    }
+    // phrases 2 and 4 share the song's bass style; phrase 3 takes it only when dense
+    assert.equal(s.bars[4].bass, s.bars[12].bass, seed);
+    assert.equal(s.bars[8].bass, m.density > 0.65 ? s.bars[4].bass : 0, seed);
+    assert.ok(["eighths", "sixteenths"].includes(s.drums.hats), seed);
+    assert.equal(s.drums.hats === "eighths", m.density < 0.35, seed);
+  }
+});

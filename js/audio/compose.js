@@ -37,6 +37,20 @@ const prog = s => s.split(" ").map(d => DEGREE[d]);
 export const HOME = ["i VI III VII", "i VII VI VII", "i VI VII i", "i iv VII i", "i III VII iv", "i VI iv VII", "i VII iv VI", "i iv VI VII"].map(prog);
 export const TURN = ["iv VI i V", "VI VII i V", "iv VII i V", "iv i VI V", "VI iv i V"].map(prog);
 
+// Arpeggio figures index into the six-note stack (triad plus triad an octave
+// up) and repeat twice per bar. -1 is a rest; perturb() plants at most one.
+export const FIGURES = {
+  upDown:  [0, 1, 2, 3, 4, 3, 2, 1],
+  wide:    [0, 2, 4, 5, 4, 2, 3, 1],
+  falling: [5, 4, 3, 2, 1, 0, 1, 2],
+  rolling: [0, 2, 1, 3, 2, 4, 3, 5],
+  pedal:   [0, 3, 0, 4, 0, 5, 0, 4],
+  climb:   [0, 1, 3, 4, 5, 4, 2, 1],
+};
+const FIG_P1 = Object.keys(FIGURES), FIG_P2 = ["wide", "rolling", "climb"], FIG_P3 = ["falling", "pedal"];
+// Bass style 2: the dotted push, sixteenth slots per bar.
+export const BASS_PUSH = [0, 3, 6, 8, 11, 14];
+
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 function weighted(rng, items, weights) {
   let total = 0;
@@ -83,6 +97,26 @@ function drawProgressions(rng) {
   return [home1, home1, turn, home2];
 }
 
+/** A pool figure with (maybe) two slots swapped and (maybe) one slot rested — same contour, different track. */
+function perturb(rng, fig, density) {
+  const f = fig.slice();
+  if (rng() < 0.3 + 0.4 * density) {
+    const a = Math.floor(rng() * 8);
+    let b = Math.floor(rng() * 7); if (b >= a) b++;
+    [f[a], f[b]] = [f[b], f[a]];
+  }
+  if (rng() < 0.5 * (1 - density)) f[Math.floor(rng() * 8)] = -1;
+  return f;
+}
+
+/** One figure per phrase: any, a wide one, a falling one, then phrase 2's again. */
+function drawFigures(rng, density) {
+  const f1 = perturb(rng, FIGURES[pick(rng, FIG_P1)], density);
+  const f2 = perturb(rng, FIGURES[pick(rng, FIG_P2)], density);
+  const f3 = perturb(rng, FIGURES[pick(rng, FIG_P3)], density);
+  return [f1, f2, f3, f2];
+}
+
 /** The song for a seed. Same seed, same song, always. */
 export function compose(seed) {
   const rng = mulberry32(hashStr(seed));
@@ -98,11 +132,21 @@ export function compose(seed) {
   };
   const drums = { hats: mood.density < 0.35 ? "eighths" : "sixteenths", hatLen: 0.8 + 0.4 * mood.brightness };
   const phrases = drawProgressions(rng);
+  const figs = drawFigures(rng, mood.density);
+  const bassStyle = weighted(rng, [0, 1, 2], [0.25, 0.5, 0.25]);
 
   const bars = [];
   for (let p = 0; p < BARS / PHRASE; p++) for (let k = 0; k < PHRASE; k++) {
     const degree = phrases[p][k];
-    bars.push({ degree, tones: voiceChord(key, degree), fill: k === PHRASE - 1 && p > 0 });
+    const late = p === 1 || p === 3;                       // phrases 2 and 4 carry the movement
+    bars.push({
+      degree, tones: voiceChord(key, degree),
+      fill: k === PHRASE - 1 && p > 0,
+      fig: figs[p],
+      arpEighths: mood.density < 0.4 && (p === 0 || p === 2),
+      bass: late || (p === 2 && mood.density > 0.65) ? bassStyle : 0,
+      open: mood.density > 0.7 && late,
+    });
   }
 
   return {
