@@ -48,8 +48,12 @@ on("geometry-loaded", ({ seed }) => {
 });
 
 // ---------- mix states ----------
+// The menu sits ~5dB under the race through a 400Hz phone-speaker highpass
+// (~9dB unfiltered), measured over four seeds. It was ~12dB under and read as
+// nearly silent on the title screen; it still has no drums or bass, so the
+// race starting remains the lift.
 const MIX = {
-  menu:  { bus: 0.55, filter: 700,  arp: 0.55, pad: 1.0, bass: 0,   drums: 0,   lead: 0.5 },
+  menu:  { bus: 1.0,  filter: 1400, arp: 0.8,  pad: 1.0, bass: 0,   drums: 0,   lead: 0.7 },
   race:  { bus: 1.0,  filter: 2600, arp: 1.0,  pad: 0.8, bass: 1.0, drums: 1.0, lead: 1.0 },
   boost: { bus: 1.0,  filter: 5200, arp: 1.3,  pad: 0.8, bass: 1.0, drums: 1.0, lead: 1.2 },
 };
