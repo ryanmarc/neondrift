@@ -107,3 +107,43 @@ test("500 seeds: figures, bass, hats follow the mood", () => {
     assert.equal(s.drums.hats === "eighths", m.density < 0.35, seed);
   }
 });
+
+test("rhythm pool: eight templates, exactly two close with a silent last beat", () => {
+  const { RHYTHMS } = C;
+  assert.equal(RHYTHMS.length, 8);
+  for (const r of RHYTHMS) { assert.equal(r.length, 16); assert.ok(r.includes(1)); }
+  assert.equal(RHYTHMS.filter(r => !r.slice(12).includes(1)).length, 2);
+});
+
+test("500 seeds: the lead", () => {
+  const { LEAD_LO, LEAD_HI } = C;
+  let withPhrase2 = 0;
+  for (const seed of SEEDS) {
+    const s = compose(seed), key = s.key;
+    const tonicOrFifth = m => [0, 7].includes(pc(m, key.tonicMidi));
+    s.bars.forEach((b, i) => {
+      const p = Math.floor(i / 4);
+      const expect = p === 3 || (p === 1 && s.mood.leadPhrases.includes(2));
+      assert.equal(!!b.lead, expect, `${seed} bar ${i} lead presence`);
+      if (!b.lead) return;
+      assert.equal(b.lead.length, 16, seed);
+      assert.ok(b.lead.some(n => n > 0), `${seed} bar ${i} lead is all rests`);
+      for (const n of b.lead) {
+        if (!n) continue;
+        assert.ok(n >= LEAD_LO && n <= LEAD_HI, `${seed} bar ${i} pitch ${n} out of range`);
+        assert.ok(inScale(n, key) || chordTone(n, b.tones), `${seed} bar ${i} pitch ${n} outside scale and chord`);
+      }
+    });
+    if (s.mood.leadPhrases.includes(2)) withPhrase2++;
+    for (const p of [1, 3]) {
+      if (!s.bars[p * 4].lead) continue;
+      const notes = [];
+      for (let k = 0; k < 4; k++) s.bars[p * 4 + k].lead.forEach(n => { if (n) notes.push({ n, tones: s.bars[p * 4 + k].tones }); });
+      assert.ok(chordTone(notes[0].n, notes[0].tones), `${seed} phrase ${p + 1} opens off the chord`);
+      assert.ok(tonicOrFifth(notes[notes.length - 1].n), `${seed} phrase ${p + 1} ends on ${notes[notes.length - 1].n}`);
+      for (let j = 2; j < notes.length; j++) assert.ok(!(notes[j].n === notes[j - 1].n && notes[j].n === notes[j - 2].n), `${seed} phrase ${p + 1} repeats a pitch three times`);
+      assert.ok(!s.bars[p * 4 + 3].lead.slice(12).some(n => n > 0), `${seed} phrase ${p + 1} last beat is not silent`);
+    }
+  }
+  assert.ok(withPhrase2 > 100 && withPhrase2 < 300, "phrase-2 leads: " + withPhrase2);
+});

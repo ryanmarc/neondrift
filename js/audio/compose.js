@@ -51,6 +51,20 @@ const FIG_P1 = Object.keys(FIGURES), FIG_P2 = ["wide", "rolling", "climb"], FIG_
 // Bass style 2: the dotted push, sixteenth slots per bar.
 export const BASS_PUSH = [0, 3, 6, 8, 11, 14];
 
+// Lead rhythm templates: 1 = a note starts on that sixteenth. Two of them
+// (indices 2 and 6) leave the last beat silent and close a phrase before the fill.
+export const RHYTHMS = [
+  [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+  [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+  [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+  [1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+  [1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+  [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+  [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0],
+];
+const CLOSING = RHYTHMS.filter(r => !r.slice(12).includes(1));
+
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 function weighted(rng, items, weights) {
   let total = 0;
@@ -117,6 +131,63 @@ function drawFigures(rng, density) {
   return [f1, f2, f3, f2];
 }
 
+// ---------- the lead ----------
+const pcOf = (m, ref) => ((m - ref) % 12 + 12) % 12;
+const inScale = (m, key) => key.scale.includes(pcOf(m, key.tonicMidi));
+const isChordTone = (m, tones) => tones.some(t => pcOf(m, t) === 0);
+/** Move one scale step from `m` in `dir` (±1). Chord tones outside the scale step to the next scale tone. */
+function stepScale(m, dir, key) { let n = m + dir; while (!inScale(n, key)) n += dir; return n; }
+/** Nearest chord tone in the lead range; ties break toward `dir`. */
+function nearestChordTone(m, tones, dir) {
+  let best = LEAD_LO, bd = Infinity;
+  for (let n = LEAD_LO; n <= LEAD_HI; n++) if (isChordTone(n, tones)) {
+    const d = Math.abs(n - m) + (Math.sign(n - m) === dir ? 0 : 0.5);
+    if (d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+const inRange = m => { while (m > LEAD_HI) m -= 12; while (m < LEAD_LO) m += 12; return m; };
+/** Which way to lean near the edges of the range: 0 in the middle. */
+const away = m => m > 82 ? -1 : m < 76 ? 1 : 0;
+
+/**
+ * A four-bar lead over `bars`: a rhythm template per bar, then a walk. The
+ * first note is a chord tone; each next moves a scale step (p 0.6) or leaps to
+ * the nearest chord tone; beats 1 and 3 snap to the chord; no pitch three
+ * times running; the phrase ends on the tonic or fifth.
+ */
+function leadPhrase(rng, bars, key) {
+  const out = bars.map(() => new Array(STEPS_PER_BAR).fill(0));
+  const slots = [];
+  bars.forEach((b, k) => {
+    const tmpl = k === PHRASE - 1 ? pick(rng, CLOSING) : pick(rng, RHYTHMS);
+    tmpl.forEach((on, s) => { if (on) slots.push([k, s]); });
+  });
+  const tonal = [];
+  for (let n = LEAD_LO; n <= LEAD_HI; n++) if ([0, 7].includes(pcOf(n, key.tonicMidi))) tonal.push(n);
+  let cur = null, prev = null, prev2 = null;
+  slots.forEach(([k, s], idx) => {
+    const tones = bars[k].tones;
+    if (cur === null) {
+      const opts = []; for (let n = LEAD_LO; n <= LEAD_HI; n++) if (isChordTone(n, tones)) opts.push(n);
+      cur = pick(rng, opts);
+    } else {
+      const dir = away(cur) || (rng() < 0.5 ? 1 : -1);
+      cur = rng() < 0.6 ? stepScale(cur, dir, key) : nearestChordTone(cur, tones, dir);
+    }
+    if (s === 0 || s === 8) cur = nearestChordTone(cur, tones, away(cur) || 1);
+    if (cur === prev && prev === prev2) cur = stepScale(cur, away(cur) || (rng() < 0.5 ? 1 : -1), key);
+    if (idx === slots.length - 1) {
+      const byDist = tonal.slice().sort((a, b) => Math.abs(a - cur) - Math.abs(b - cur));
+      cur = byDist[0] === prev && prev === prev2 ? byDist[1] : byDist[0];
+    }
+    cur = inRange(cur);
+    out[k][s] = cur;
+    prev2 = prev; prev = cur;
+  });
+  return out;
+}
+
 /** The song for a seed. Same seed, same song, always. */
 export function compose(seed) {
   const rng = mulberry32(hashStr(seed));
@@ -148,6 +219,12 @@ export function compose(seed) {
       open: mood.density > 0.7 && late,
     });
   }
+
+  for (const ph of mood.leadPhrases) {
+    const p = ph - 1, slice = bars.slice(p * PHRASE, p * PHRASE + PHRASE);
+    leadPhrase(rng, slice, key).forEach((line, k) => { bars[p * PHRASE + k].lead = line; });
+  }
+  for (const b of bars) if (!b.lead) b.lead = null;
 
   return {
     seed, bpm, step: 60 / bpm / 4,
