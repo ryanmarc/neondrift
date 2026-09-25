@@ -147,3 +147,21 @@ test("500 seeds: the lead", () => {
   }
   assert.ok(withPhrase2 > 100 && withPhrase2 < 300, "phrase-2 leads: " + withPhrase2);
 });
+
+test("advance takes a pending song only on a bar line, and from its bar 1", () => {
+  const { advance, STEPS_PER_BAR, TOTAL_STEPS } = C;
+  const a = compose("a"), b = compose("b"), c = compose("c");
+  assert.deepEqual(advance({ song: a, step: 5 }, b), { song: a, step: 5, swapped: false });
+  assert.deepEqual(advance({ song: a, step: 15 }, b), { song: a, step: 15, swapped: false });
+  assert.deepEqual(advance({ song: a, step: 16 }, b), { song: b, step: 0, swapped: true });
+  assert.deepEqual(advance({ song: a, step: 0 }, b), { song: b, step: 0, swapped: true });
+  assert.deepEqual(advance({ song: a, step: 48 }, b), { song: b, step: 0, swapped: true });
+  assert.deepEqual(advance({ song: a, step: 48 }, null), { song: a, step: 48, swapped: false });
+  assert.deepEqual(advance({ song: a, step: 48 }, a), { song: a, step: 48, swapped: false });
+  // two loads inside a bar: only the latest pending sounds
+  let st = { song: a, step: 3 };
+  let pending = b; st = advance(st, pending); assert.equal(st.song, a);
+  pending = c; st = { song: st.song, step: 16 }; st = advance(st, pending);
+  assert.equal(st.song, c); assert.equal(st.step, 0);
+  assert.equal(TOTAL_STEPS, 16 * STEPS_PER_BAR);
+});

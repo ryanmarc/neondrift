@@ -232,3 +232,16 @@ export function compose(seed) {
     mood, key, voice, drums, bars,
   };
 }
+
+// ---------- the sequencer's swap ----------
+/**
+ * Which song plays the step that is about to sound. `state` is { song, step }
+ * with `step` the position (0..TOTAL_STEPS-1) the scheduler is at; `pending`
+ * is a newly composed song or null. A pending song is taken only when the step
+ * starts a bar, and it starts from its own bar 1 — so a track change lands on
+ * the bar line with the drums running through it, and the music never restarts.
+ */
+export function advance(state, pending) {
+  if (pending && pending !== state.song && state.step % STEPS_PER_BAR === 0) return { song: pending, step: 0, swapped: true };
+  return { song: state.song, step: state.step, swapped: false };
+}
