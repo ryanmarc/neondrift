@@ -304,8 +304,8 @@ Conventions:
   through it. Notes are scheduled 1.5s ahead on the audio clock from a 250ms
   timer — far enough that a background tab's 1Hz timer throttling can't
   starve it; nodes are made per note, not per frame. Every chord root is
-  voiced into MIDI 50..61, so kick and bass stay above ~140Hz for the same
-  phone-speaker reason as the boost thump.
+  voiced into MIDI 50..61, so bass and pad stay above ~140Hz for the same
+  phone-speaker reason as the boost thump (the kick has its own 260→150Hz sweep).
 - **A run is posted when it beats your posted time, not your local ghost.**
   The two can differ (a best set before naming yourself, or offline). With no
   board loaded the local personal-best rule applies. The server still only

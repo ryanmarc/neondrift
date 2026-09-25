@@ -40,8 +40,11 @@ let cur = { song: null, step: 0 };   // what plays next
 let pending = null;
 
 on("geometry-loaded", ({ seed }) => {
-  const song = compose(seed);
-  if (!cur.song) cur = { song, step: 0 }; else pending = song;
+  if (!cur.song) { cur = { song: compose(seed), step: 0 }; return; }
+  // The track already playing, loaded again (Wide road's rebuild, a restart, a
+  // day toggled back within a bar): keep playing, and drop any other pending.
+  if (seed === cur.song.seed) { pending = null; return; }
+  if (!pending || pending.seed !== seed) pending = compose(seed);
 });
 
 // ---------- mix states ----------

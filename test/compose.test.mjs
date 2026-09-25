@@ -165,3 +165,27 @@ test("advance takes a pending song only on a bar line, and from its bar 1", () =
   assert.equal(st.song, c); assert.equal(st.step, 0);
   assert.equal(TOTAL_STEPS, 16 * STEPS_PER_BAR);
 });
+
+test("advance ignores a recomposed song for the seed already playing", () => {
+  const { advance } = C;
+  const a1 = compose("2026-09-22#run3"), a2 = compose("2026-09-22#run3");
+  assert.notEqual(a1, a2, "compose returns a fresh object each time");
+  assert.deepEqual(advance({ song: a1, step: 16 }, a2), { song: a1, step: 16, swapped: false });
+  assert.deepEqual(advance({ song: a1, step: 0 }, a2), { song: a1, step: 0, swapped: false });
+});
+
+test("500 seeds: lead notes on beats 1 and 3 are chord tones", () => {
+  for (const seed of SEEDS) {
+    const s = compose(seed);
+    for (const p of [1, 3]) {
+      if (!s.bars[p * 4].lead) continue;
+      let last = null;
+      for (let k = 0; k < 4; k++) s.bars[p * 4 + k].lead.forEach((n, slot) => { if (n) last = [k, slot]; });
+      for (let k = 0; k < 4; k++) for (const slot of [0, 8]) {
+        const n = s.bars[p * 4 + k].lead[slot];
+        if (!n || (last[0] === k && last[1] === slot)) continue;
+        assert.ok(chordTone(n, s.bars[p * 4 + k].tones), `${seed} phrase ${p + 1} bar ${k} beat ${slot / 4 + 1} pitch ${n} is off the chord`);
+      }
+    }
+  }
+});

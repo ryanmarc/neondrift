@@ -137,6 +137,12 @@ const inScale = (m, key) => key.scale.includes(pcOf(m, key.tonicMidi));
 const isChordTone = (m, tones) => tones.some(t => pcOf(m, t) === 0);
 /** Move one scale step from `m` in `dir` (±1). Chord tones outside the scale step to the next scale tone. */
 function stepScale(m, dir, key) { let n = m + dir; while (!inScale(n, key)) n += dir; return n; }
+/** The next chord tone strictly past `m` in `dir`, turning round at the range edge; never `m` itself. */
+function nextChordTone(m, tones, dir) {
+  for (let n = m + dir; n >= LEAD_LO && n <= LEAD_HI; n += dir) if (isChordTone(n, tones)) return n;
+  for (let n = m - dir; n >= LEAD_LO && n <= LEAD_HI; n -= dir) if (isChordTone(n, tones)) return n;
+  return m;
+}
 /** Nearest chord tone in the lead range; ties break toward `dir`. */
 function nearestChordTone(m, tones, dir) {
   let best = LEAD_LO, bd = Infinity;
@@ -176,7 +182,11 @@ function leadPhrase(rng, bars, key) {
       cur = rng() < 0.6 ? stepScale(cur, dir, key) : nearestChordTone(cur, tones, dir);
     }
     if (s === 0 || s === 8) cur = nearestChordTone(cur, tones, away(cur) || 1);
-    if (cur === prev && prev === prev2) cur = stepScale(cur, away(cur) || (rng() < 0.5 ? 1 : -1), key);
+    if (cur === prev && prev === prev2) {
+      // Rule 3 runs after the downbeat snap, so on a downbeat it moves to another chord tone, not off the chord.
+      const dir = away(cur) || (rng() < 0.5 ? 1 : -1);
+      cur = s === 0 || s === 8 ? nextChordTone(cur, tones, dir) : stepScale(cur, dir, key);
+    }
     if (idx === slots.length - 1) {
       const byDist = tonal.slice().sort((a, b) => Math.abs(a - cur) - Math.abs(b - cur));
       cur = byDist[0] === prev && prev === prev2 ? byDist[1] : byDist[0];
@@ -242,6 +252,10 @@ export function compose(seed) {
  * the bar line with the drums running through it, and the music never restarts.
  */
 export function advance(state, pending) {
-  if (pending && pending !== state.song && state.step % STEPS_PER_BAR === 0) return { song: pending, step: 0, swapped: true };
+  // Compared by seed, not identity: the same track loaded again (Wide road's
+  // rebuild, a restart, a day toggled back) composes a fresh object of the same
+  // song, and taking it would jump the tune back to bar 1.
+  const fresh = pending && !(state.song && pending.seed === state.song.seed);
+  if (fresh && state.step % STEPS_PER_BAR === 0) return { song: pending, step: 0, swapped: true };
   return { song: state.song, step: state.step, swapped: false };
 }
