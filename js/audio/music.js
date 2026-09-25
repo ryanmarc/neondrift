@@ -1,5 +1,5 @@
 // Background music, synthesized at runtime — no files. A sixteen-bar synthwave
-// loop in A minor (see SONG below) sequenced on the audio clock: a timer wakes
+// loop composed per track by compose.js, sequenced on the audio clock: a timer wakes
 // every 250ms and schedules every note that falls in the next 1.5s, which is
 // the standard way to keep Web Audio timing tight while the main thread jitters.
 // Nodes are created per NOTE (a couple of dozen a second), never per frame.
@@ -16,51 +16,33 @@
 import * as storage from "../core/storage.js";
 import { whenReady } from "./context.js";
 
+import { on } from "../core/events.js";
+import { compose, advance, STEPS_PER_BAR, TOTAL_STEPS, BASS_PUSH } from "./compose.js";
+
 const KEY = "neondrift:music";
-const BPM = 118;
-const STEP = 60 / BPM / 4;          // one sixteenth, seconds
-const STEPS_PER_BAR = 16;
 // Schedule well ahead: browsers throttle timers in background tabs to once a
 // second, and a lookahead longer than that keeps the loop continuous anyway.
 // Nothing is lost by it — the mix is gains and a filter, not per-note choices.
 const LOOKAHEAD = 1.5, TICK_MS = 250;
+// A song exists before the audio does: geometry-loaded fires at boot, long
+// before the first tap. Composing needs no AudioContext, so the first song is
+// simply waiting when start() runs. If start() somehow beats it, this seed.
+const FALLBACK_SEED = "neondrift";
 
 // ---------- the tune ----------
-// MIDI note numbers; 69 = A4 = 440Hz. Sixteen bars in four phrases:
-//   1  Am F C G   plain
-//   2  Am F C G   wider arpeggio, bass jumps the octave, fill into phrase 3
-//   3  Dm F Am E  the turn — E major against the minor key gives the tension
-//   4  F G Am G   lead melody on top, big fill, then round again
-// Bass and pad roots stay above the ~140Hz phone-speaker floor.
-const CHORDS = {
-  Am: [57, 60, 64], F: [53, 57, 60], C: [60, 64, 67], G: [55, 59, 62],
-  Dm: [50, 53, 57], E: [52, 56, 59],
-};
-// Arpeggio figures index into the chord's six-note stack (triad + triad an
-// octave up) and are played twice per bar.
-const FIGURES = [
-  [0, 1, 2, 3, 4, 3, 2, 1],   // up and down
-  [0, 2, 4, 5, 4, 2, 3, 1],   // wider, brighter
-  [5, 4, 3, 2, 1, 0, 1, 2],   // falling
-];
-// Lead melody for phrase 4, one slot per sixteenth (0 = rest).
-const LEAD = [
-  [76, 0, 0, 0, 79, 0, 0, 0, 81, 0, 0, 0, 79, 0, 76, 0],
-  [79, 0, 0, 0, 76, 0, 0, 0, 74, 0, 0, 0, 76, 0, 0, 0],
-  [72, 0, 0, 0, 76, 0, 0, 0, 81, 0, 0, 0, 84, 0, 81, 0],
-  [79, 0, 0, 0, 76, 0, 74, 0, 72, 0, 0, 0, 0, 0, 0, 0],
-];
-// One entry per bar: chord, arpeggio figure, bass style (0 roots, 1 octave
-// jumps), open hats on the off-beats, snare fill in the last beat, lead line.
-const bar = (chord, fig, bass, open, fill, lead) => ({ chord, fig, bass, open, fill, lead });
-const SONG = [
-  bar("Am", 0, 0, 0, 0, null), bar("F", 0, 0, 0, 0, null), bar("C", 0, 0, 0, 0, null), bar("G", 0, 0, 0, 0, null),
-  bar("Am", 1, 1, 1, 0, null), bar("F", 1, 1, 1, 0, null), bar("C", 1, 1, 1, 0, null), bar("G", 1, 1, 1, 1, null),
-  bar("Dm", 2, 0, 0, 0, null), bar("F", 2, 0, 0, 0, null), bar("Am", 0, 0, 0, 0, null), bar("E", 2, 0, 0, 1, null),
-  bar("F", 1, 1, 1, 0, LEAD[0]), bar("G", 1, 1, 1, 0, LEAD[1]), bar("Am", 1, 1, 1, 0, LEAD[2]), bar("G", 1, 1, 1, 1, LEAD[3]),
-];
+// Composed per track by compose.js from the track's seed (not its geometry
+// id: a run's Wide road rebuilds a stage's geometry mid-run and the tune must
+// not flip with it). A new song is parked as `pending` and taken by advance()
+// on the next bar line, so the beat never stops — the day browser and a run's
+// stage changes land as a bar change, not a reload.
 const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
-const BARS = SONG.length;
+let cur = { song: null, step: 0 };   // what plays next
+let pending = null;
+
+on("geometry-loaded", ({ seed }) => {
+  const song = compose(seed);
+  if (!cur.song) cur = { song, step: 0 }; else pending = song;
+});
 
 // ---------- mix states ----------
 const MIX = {
@@ -76,7 +58,7 @@ let arpG = null, padG = null, bassG = null, drumG = null, leadG = null;
 let noiseBuf = null;
 let enabled = storage.read(KEY) !== "0";                  // on by default
 let state = "menu";
-let timer = null, nextTime = 0, step = 0;
+let timer = null, nextTime = 0;
 let ready = false;
 
 whenReady((c, master) => {
@@ -137,38 +119,45 @@ function kick(t0) {
   noise(t0, 0.02, drumG, 0.12, "highpass", 2500);        // the click
 }
 
-function playStep(i, t) {
-  const b = SONG[Math.floor(i / STEPS_PER_BAR) % BARS], s = i % STEPS_PER_BAR;
-  const tones = CHORDS[b.chord];
+function playStep(song, i, t) {
+  const b = song.bars[Math.floor(i / STEPS_PER_BAR)], s = i % STEPS_PER_BAR;
+  const STEP = song.step;
+  const tones = b.tones;
   const stack = [tones[0], tones[1], tones[2], tones[0] + 12, tones[1] + 12, tones[2] + 12];
+  const ts = t + (s % 2 ? song.swing * STEP : 0);   // swing leans the odd sixteenths; the grid stays straight
 
-  // arpeggio: sixteenths, short and plucky, an octave above the pad
-  osc("sawtooth", hz(stack[FIGURES[b.fig][s % 8]] + 12), t, t + STEP * 0.9, arpG, 0.06, 0.006, 0.05);
+  // arpeggio: sixteenths (or eighths in a sparse phrase), short and plucky, an octave above the pad
+  const fi = b.fig[s % 8];
+  if (fi >= 0 && !(b.arpEighths && s % 2)) osc(song.voice.arp, hz(stack[fi] + 12), ts, ts + STEP * 0.9, arpG, 0.06, 0.006, 0.05);
 
-  // bass: eighths on the root; style 1 jumps the octave on the off-beats
-  if (s % 2 === 0) {
+  // bass: style 0 roots on eighths; 1 jumps the octave on the off-beats; 2 the dotted push
+  if (b.bass === 2) {
+    if (BASS_PUSH.includes(s)) osc("sawtooth", hz(tones[0]), ts, ts + STEP * 1.4, bassG, 0.11, 0.008, 0.06);
+  } else if (s % 2 === 0) {
     const up = b.bass === 1 && s % 4 === 2;
-    osc("sawtooth", hz(tones[0] + (up ? 12 : 0)), t, t + STEP * (up ? 1.2 : 1.7), bassG, up ? 0.08 : 0.11, 0.008, 0.06);
+    osc("sawtooth", hz(tones[0] + (up ? 12 : 0)), ts, ts + STEP * (up ? 1.2 : 1.7), bassG, up ? 0.08 : 0.11, 0.008, 0.06);
   }
 
   // pad: one chord per bar, two detuned saws per note, slow in and out
   if (s === 0) {
     const t1 = t + STEP * STEPS_PER_BAR;
     for (const n of tones) {
-      osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, -7);
-      osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, +7);
+      osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, -song.voice.detune);
+      osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, +song.voice.detune);
     }
   }
 
-  // lead: a square with a soft edge, only where the song table says so
-  if (b.lead && b.lead[s]) osc("square", hz(b.lead[s]), t, t + STEP * 1.8, leadG, 0.03, 0.01, 0.12);
+  // lead: a soft-edged square or triangle, only where the song table says so
+  if (b.lead && b.lead[s]) osc(song.voice.lead, hz(b.lead[s]), ts, ts + STEP * 1.8, leadG, 0.03, 0.01, 0.12);
 
-  // drums: four-on-the-floor kick, snare on 2 and 4, hats on every sixteenth
+  // drums: four-on-the-floor kick, snare on 2 and 4, hats on every sixteenth or eighth
   if (s % 4 === 0) kick(t);
   if (s === 4 || s === 12) noise(t, 0.14, drumG, 0.14, "bandpass", 1800, 0.8);
   if (b.fill && s >= 12) noise(t, 0.10, drumG, 0.05 + 0.03 * (s - 12), "bandpass", 1800, 0.8);   // rising snare roll
+  if (song.drums.hats === "eighths" && s % 2) return;
   const openHat = b.open && s % 4 === 2;
-  noise(t, openHat ? 0.12 : s % 4 === 2 ? 0.06 : 0.03, drumG, openHat ? 0.05 : s % 4 === 2 ? 0.045 : 0.025, "highpass", 7000);
+  const hl = song.drums.hatLen;
+  noise(ts, (openHat ? 0.12 : s % 4 === 2 ? 0.06 : 0.03) * hl, drumG, openHat ? 0.05 : s % 4 === 2 ? 0.045 : 0.025, "highpass", 7000);
 }
 
 // ---------- sequencer ----------
@@ -177,14 +166,21 @@ function schedule() {
   const now = ctx.currentTime;
   if (nextTime < now - 0.5) nextTime = now + 0.05;      // fell behind (tab was hidden): skip, don't burst
   while (nextTime < now + LOOKAHEAD) {
-    playStep(step, nextTime);
-    nextTime += STEP;
-    step = (step + 1) % (STEPS_PER_BAR * BARS);
+    const next = advance(cur, pending);
+    if (next.swapped) {
+      pending = null;
+      filter.Q.setTargetAtTime(next.song.voice.q, nextTime, 0.1);
+    }
+    playStep(next.song, next.step, nextTime);
+    nextTime += next.song.step;
+    cur = { song: next.song, step: (next.step + 1) % TOTAL_STEPS };
   }
 }
 
 function start() {
   if (timer || !ready) return;
+  if (!cur.song) cur = { song: compose(FALLBACK_SEED), step: 0 };
+  filter.Q.value = cur.song.voice.q;
   nextTime = ctx.currentTime + 0.05;
   timer = setInterval(schedule, TICK_MS);
   applyMix(0.3);
@@ -224,7 +220,9 @@ export function toggle() {
   return enabled;
 }
 
-/** For the dev handle: what the mix is doing right now. */
+/** For the dev handle: what the mix is doing right now, and which tune. */
 export function debug() {
-  return ready ? { state, enabled, playing: !!timer, filter: filter.frequency.value, bus: bus.gain.value, step } : { ready: false };
+  const s = cur.song;
+  const tune = s ? { seed: s.seed, bpm: s.bpm, mode: s.key.mode, mood: s.mood, pending: pending ? pending.seed : null } : {};
+  return ready ? { state, enabled, playing: !!timer, filter: filter.frequency.value, bus: bus.gain.value, step: cur.step, ...tune } : { ready: false, ...tune };
 }
