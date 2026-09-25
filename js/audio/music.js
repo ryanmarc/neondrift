@@ -17,7 +17,7 @@ import * as storage from "../core/storage.js";
 import { whenReady } from "./context.js";
 
 import { on } from "../core/events.js";
-import { compose, advance, resume, STEPS_PER_BAR, TOTAL_STEPS, BASS_PUSH } from "./compose.js";
+import { compose, resume, STEPS_PER_BAR, TOTAL_STEPS, BASS_PUSH } from "./compose.js";
 
 const KEY = "neondrift:music";
 // Schedule well ahead: browsers throttle timers in background tabs to once a
@@ -32,19 +32,28 @@ const FALLBACK_SEED = "neondrift";
 // ---------- the tune ----------
 // Composed per track by compose.js from the track's seed (not its geometry
 // id: a run's Wide road rebuilds a stage's geometry mid-run and the tune must
-// not flip with it). A new song is parked as `pending` and taken by advance()
-// on the next bar line, so the beat never stops — the day browser and a run's
-// stage changes land as a bar change, not a reload.
+// not flip with it). A track change is heard at once: the old tune's notes,
+// already queued up to LOOKAHEAD ahead, fade out through its own gains and the
+// new tune starts from its bar 1. While the music is off or not yet unlocked,
+// the song is parked as `pending` and start() takes it.
 const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
 let cur = { song: null, step: 0 };   // what plays next
 let pending = null;
+// Fade-out time constant for the old tune's queued notes: gone in ~0.1s.
+const CUT = 0.03;
+// The pad swells in over 0.35s, and on the menu (no drums) that left a
+// near-silent hole after a track change. The first chord of a switched-in tune
+// comes in fast instead; every later chord swells as usual.
+const PAD_ATTACK = 0.35, PAD_ATTACK_SWITCH = 0.04;
+let fastPad = false;
 
 on("geometry-loaded", ({ seed }) => {
   if (!cur.song) { cur = { song: compose(seed), step: 0 }; return; }
   // The track already playing, loaded again (Wide road's rebuild, a restart, a
-  // day toggled back within a bar): keep playing, and drop any other pending.
+  // day toggled back): keep playing, and drop any other pending.
   if (seed === cur.song.seed) { pending = null; return; }
-  if (!pending || pending.seed !== seed) pending = compose(seed);
+  const song = pending && pending.seed === seed ? pending : compose(seed);
+  if (timer) switchTo(song); else pending = song;
 });
 
 // ---------- mix states ----------
@@ -62,6 +71,7 @@ const BUS_GAIN = 0.35;              // the whole music under the effects (0.42 w
 let ctx = null;
 let bus = null, tone = null, filter = null;               // bus ← filter ← tone layers; drums → bus
 let arpG = null, padG = null, bassG = null, drumG = null, leadG = null;
+let gen = null;                                          // this tune's own layer gains, so a track change can cut its queued notes
 let noiseBuf = null;
 let enabled = storage.read(KEY) !== "0";                  // on by default
 let state = "menu";
@@ -113,7 +123,23 @@ function noise(t0, dur, dest, peak, filterType, freq, q = 1) {
   s.start(t0); s.stop(t0 + dur + 0.02);
 }
 
-function kick(t0) {
+// One set of gains per tune, feeding the shared layer gains. Five nodes per
+// track change, never per frame. Cutting a tune ramps its set to silence and
+// disconnects it once every note it queued has ended.
+function newGen() {
+  const g = {};
+  for (const [k, dest] of [["arp", arpG], ["pad", padG], ["bass", bassG], ["lead", leadG], ["drum", drumG]]) {
+    g[k] = ctx.createGain(); g[k].connect(dest);
+  }
+  return g;
+}
+
+function cutGen(g, t) {
+  for (const n of Object.values(g)) n.gain.setTargetAtTime(0, t, CUT);
+  setTimeout(() => { for (const n of Object.values(g)) n.disconnect(); }, (LOOKAHEAD + 2) * 1000);
+}
+
+function kick(t0, dest) {
   // Pitch drop kept above the phone-speaker floor: a real sub just distorts there.
   const o = ctx.createOscillator(); o.type = "sine";
   o.frequency.setValueAtTime(260, t0);
@@ -121,9 +147,9 @@ function kick(t0) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.5, t0);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.26);
-  o.connect(g); g.connect(drumG);
+  o.connect(g); g.connect(dest);
   o.start(t0); o.stop(t0 + 0.3);
-  noise(t0, 0.02, drumG, 0.12, "highpass", 2500);        // the click
+  noise(t0, 0.02, dest, 0.12, "highpass", 2500);        // the click
 }
 
 function playStep(song, i, t) {
@@ -135,36 +161,38 @@ function playStep(song, i, t) {
 
   // arpeggio: sixteenths (or eighths in a sparse phrase), short and plucky, an octave above the pad
   const fi = b.fig[s % 8];
-  if (fi >= 0 && !(b.arpEighths && s % 2)) osc(song.voice.arp, hz(stack[fi] + 12), ts, ts + STEP * 0.9, arpG, 0.06, 0.006, 0.05);
+  if (fi >= 0 && !(b.arpEighths && s % 2)) osc(song.voice.arp, hz(stack[fi] + 12), ts, ts + STEP * 0.9, gen.arp, 0.06, 0.006, 0.05);
 
   // bass: style 0 roots on eighths; 1 jumps the octave on the off-beats; 2 the dotted push
   if (b.bass === 2) {
-    if (BASS_PUSH.includes(s)) osc("sawtooth", hz(tones[0]), ts, ts + STEP * 1.4, bassG, 0.11, 0.008, 0.06);
+    if (BASS_PUSH.includes(s)) osc("sawtooth", hz(tones[0]), ts, ts + STEP * 1.4, gen.bass, 0.11, 0.008, 0.06);
   } else if (s % 2 === 0) {
     const up = b.bass === 1 && s % 4 === 2;
-    osc("sawtooth", hz(tones[0] + (up ? 12 : 0)), ts, ts + STEP * (up ? 1.2 : 1.7), bassG, up ? 0.08 : 0.11, 0.008, 0.06);
+    osc("sawtooth", hz(tones[0] + (up ? 12 : 0)), ts, ts + STEP * (up ? 1.2 : 1.7), gen.bass, up ? 0.08 : 0.11, 0.008, 0.06);
   }
 
   // pad: one chord per bar, two detuned saws per note, slow in and out
   if (s === 0) {
     const t1 = t + STEP * STEPS_PER_BAR;
+    const attack = fastPad ? PAD_ATTACK_SWITCH : PAD_ATTACK;
+    fastPad = false;
     for (const n of tones) {
-      osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, -song.voice.detune);
-      osc("sawtooth", hz(n), t, t1 + 0.1, padG, 0.022, 0.35, 0.4, +song.voice.detune);
+      osc("sawtooth", hz(n), t, t1 + 0.1, gen.pad, 0.022, attack, 0.4, -song.voice.detune);
+      osc("sawtooth", hz(n), t, t1 + 0.1, gen.pad, 0.022, attack, 0.4, +song.voice.detune);
     }
   }
 
   // lead: a soft-edged square or triangle, only where the song table says so
-  if (b.lead && b.lead[s]) osc(song.voice.lead, hz(b.lead[s]), ts, ts + STEP * 1.8, leadG, 0.03, 0.01, 0.12);
+  if (b.lead && b.lead[s]) osc(song.voice.lead, hz(b.lead[s]), ts, ts + STEP * 1.8, gen.lead, 0.03, 0.01, 0.12);
 
   // drums: four-on-the-floor kick, snare on 2 and 4, hats on every sixteenth or eighth
-  if (s % 4 === 0) kick(t);
-  if (s === 4 || s === 12) noise(t, 0.14, drumG, 0.14, "bandpass", 1800, 0.8);
-  if (b.fill && s >= 12) noise(t, 0.10, drumG, 0.05 + 0.03 * (s - 12), "bandpass", 1800, 0.8);   // rising snare roll
+  if (s % 4 === 0) kick(t, gen.drum);
+  if (s === 4 || s === 12) noise(t, 0.14, gen.drum, 0.14, "bandpass", 1800, 0.8);
+  if (b.fill && s >= 12) noise(t, 0.10, gen.drum, 0.05 + 0.03 * (s - 12), "bandpass", 1800, 0.8);   // rising snare roll
   if (song.drums.hats === "eighths" && s % 2) return;
   const openHat = b.open && s % 4 === 2;
   const hl = song.drums.hatLen;
-  noise(ts, (openHat ? 0.12 : s % 4 === 2 ? 0.06 : 0.03) * hl, drumG, openHat ? 0.05 : s % 4 === 2 ? 0.045 : 0.025, "highpass", 7000);
+  noise(ts, (openHat ? 0.12 : s % 4 === 2 ? 0.06 : 0.03) * hl, gen.drum, openHat ? 0.05 : s % 4 === 2 ? 0.045 : 0.025, "highpass", 7000);
 }
 
 // ---------- sequencer ----------
@@ -173,24 +201,33 @@ function schedule() {
   const now = ctx.currentTime;
   if (nextTime < now - 0.5) nextTime = now + 0.05;      // fell behind (tab was hidden): skip, don't burst
   while (nextTime < now + LOOKAHEAD) {
-    const next = advance(cur, pending);
-    if (next.swapped) {
-      pending = null;
-      filter.Q.setTargetAtTime(next.song.voice.q, nextTime, 0.1);
-    }
-    playStep(next.song, next.step, nextTime);
-    nextTime += next.song.step;
-    cur = { song: next.song, step: (next.step + 1) % TOTAL_STEPS };
+    playStep(cur.song, cur.step, nextTime);
+    nextTime += cur.song.step;
+    cur = { song: cur.song, step: (cur.step + 1) % TOTAL_STEPS };
   }
+}
+
+/** Start playing `song` from its bar 1 now: cut the old tune's queued notes and give the new one fresh gains. */
+function switchTo(song) {
+  const t = ctx.currentTime;
+  if (gen) cutGen(gen, t);
+  gen = newGen();
+  cur = { song, step: 0 }; pending = null;
+  fastPad = true;
+  filter.Q.setTargetAtTime(song.voice.q, t, 0.05);
+  nextTime = t + 0.03;
+  schedule();
 }
 
 function start() {
   if (timer || !ready) return;
-  // A song parked while the music was off is taken now, not at the next bar
-  // line — there is no beat to keep. The fallback covers start() before any
-  // geometry-loaded.
+  // A song parked while the music was off is taken now. The fallback covers
+  // start() before any geometry-loaded. Fresh gains, so nothing still queued
+  // from before a stop() overlaps the restart.
   cur = resume(cur, pending); pending = null;
   if (!cur.song) cur = { song: compose(FALLBACK_SEED), step: 0 };
+  if (gen) cutGen(gen, ctx.currentTime);
+  gen = newGen();
   filter.Q.setValueAtTime(cur.song.voice.q, ctx.currentTime);
   nextTime = ctx.currentTime + 0.05;
   timer = setInterval(schedule, TICK_MS);

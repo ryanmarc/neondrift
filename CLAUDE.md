@@ -228,7 +228,7 @@ js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden
             sfx.js      effects: update(), engineUpdate(); subscribes to game events; re-exports the context API
             engine.js   the engine: stepEngine(model, input, dt, P) is pure (gears, revs, load); createEngine(ctx, bus) builds the nodes
             music.js    the sequencer: plays a composed song on the audio clock; update(live, boosting) picks the mix
-            compose.js  compose(seed) → song: pure, seeded; the pools, the mood, advance() for the bar-line swap
+            compose.js  compose(seed) → song: pure, seeded; the pools, the mood, resume() for which song plays next
 js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
             api.js      fetch wrappers for the leaderboard API; every failure resolves to null
             leaderboard.js `board` state; posts runs that beat your posted time; rename; pairing; challenge links; emits board-updated, challenge
@@ -298,12 +298,15 @@ Conventions:
   composed per track by `audio/compose.js` from `track.seed` (not the geometry
   id: Wide road rebuilds a stage's geometry mid-run and the tune must not
   flip with it) on the `geometry-loaded` event, which `loadTrackGeometry`
-  emits for the daily track and every run stage alike. A new song is parked
-  as pending and taken by `advance()` on the next bar line, so the day browser
-  and a run's stage changes land as a bar change with the drums running
-  through it. Notes are scheduled 1.5s ahead on the audio clock from a 250ms
-  timer — far enough that a background tab's 1Hz timer throttling can't
-  starve it; nodes are made per note, not per frame. Every chord root is
+  emits for the daily track and every run stage alike. A track change is
+  heard at once: each tune plays through its own set of five layer gains,
+  so the old tune's already-queued notes fade out in ~0.1s and the new one
+  starts from its bar 1, its first pad chord coming in fast so the menu
+  (no drums) has no silent hole. The same seed loaded again keeps its place.
+  While the music is off the new song waits as pending for `start()`.
+  Notes are scheduled 1.5s ahead on the audio clock from a 250ms timer — far
+  enough that a background tab's 1Hz timer throttling can't starve it; nodes
+  are made per note and five per track change, never per frame. Every chord root is
   voiced into MIDI 50..61, so bass and pad stay above ~140Hz for the same
   phone-speaker reason as the boost thump (the kick has its own 260→150Hz sweep).
 - **A run is posted when it beats your posted time, not your local ghost.**

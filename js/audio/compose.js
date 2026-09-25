@@ -245,25 +245,11 @@ export function compose(seed) {
 
 // ---------- the sequencer's swap ----------
 /**
- * Which song plays the step that is about to sound. `state` is { song, step }
- * with `step` the position (0..TOTAL_STEPS-1) the scheduler is at; `pending`
- * is a newly composed song or null. A pending song is taken only when the step
- * starts a bar, and it starts from its own bar 1 — so a track change lands on
- * the bar line with the drums running through it, and the music never restarts.
- */
-export function advance(state, pending) {
-  // Compared by seed, not identity: the same track loaded again (Wide road's
-  // rebuild, a restart, a day toggled back) composes a fresh object of the same
-  // song, and taking it would jump the tune back to bar 1.
-  const fresh = pending && !(state.song && pending.seed === state.song.seed);
-  if (fresh && state.step % STEPS_PER_BAR === 0) return { song: pending, step: 0, swapped: true };
-  return { song: state.song, step: state.step, swapped: false };
-}
-
-/**
- * The state to start (or restart) the sequencer from. Music that was off has
- * no bar line to wait for, so a pending song for another track is taken at
- * once, from its bar 1; the same seed keeps its place.
+ * Which song to play from now. A song for another track is taken at once,
+ * from its bar 1 — a track change is heard the moment it happens, never held
+ * for a bar line. The same seed (Wide road's rebuild, a restart, a day toggled
+ * back) composes a fresh object of the same song; it keeps its place, so the
+ * tune doesn't jump back to bar 1.
  */
 export function resume(state, pending) {
   if (pending && !(state.song && pending.seed === state.song.seed)) return { song: pending, step: 0 };

@@ -148,30 +148,8 @@ test("500 seeds: the lead", () => {
   assert.ok(withPhrase2 > 100 && withPhrase2 < 300, "phrase-2 leads: " + withPhrase2);
 });
 
-test("advance takes a pending song only on a bar line, and from its bar 1", () => {
-  const { advance, STEPS_PER_BAR, TOTAL_STEPS } = C;
-  const a = compose("a"), b = compose("b"), c = compose("c");
-  assert.deepEqual(advance({ song: a, step: 5 }, b), { song: a, step: 5, swapped: false });
-  assert.deepEqual(advance({ song: a, step: 15 }, b), { song: a, step: 15, swapped: false });
-  assert.deepEqual(advance({ song: a, step: 16 }, b), { song: b, step: 0, swapped: true });
-  assert.deepEqual(advance({ song: a, step: 0 }, b), { song: b, step: 0, swapped: true });
-  assert.deepEqual(advance({ song: a, step: 48 }, b), { song: b, step: 0, swapped: true });
-  assert.deepEqual(advance({ song: a, step: 48 }, null), { song: a, step: 48, swapped: false });
-  assert.deepEqual(advance({ song: a, step: 48 }, a), { song: a, step: 48, swapped: false });
-  // two loads inside a bar: only the latest pending sounds
-  let st = { song: a, step: 3 };
-  let pending = b; st = advance(st, pending); assert.equal(st.song, a);
-  pending = c; st = { song: st.song, step: 16 }; st = advance(st, pending);
-  assert.equal(st.song, c); assert.equal(st.step, 0);
-  assert.equal(TOTAL_STEPS, 16 * STEPS_PER_BAR);
-});
-
-test("advance ignores a recomposed song for the seed already playing", () => {
-  const { advance } = C;
-  const a1 = compose("2026-09-22#run3"), a2 = compose("2026-09-22#run3");
-  assert.notEqual(a1, a2, "compose returns a fresh object each time");
-  assert.deepEqual(advance({ song: a1, step: 16 }, a2), { song: a1, step: 16, swapped: false });
-  assert.deepEqual(advance({ song: a1, step: 0 }, a2), { song: a1, step: 0, swapped: false });
+test("advance is gone: a track change never waits for a bar line", () => {
+  assert.equal(C.advance, undefined);
 });
 
 test("500 seeds: lead notes on beats 1 and 3 are chord tones", () => {
@@ -197,4 +175,6 @@ test("resume takes a pending song at once, from its bar 1", () => {
   assert.deepEqual(resume({ song: a, step: 37 }, null), { song: a, step: 37 });
   assert.deepEqual(resume({ song: a, step: 37 }, a2), { song: a, step: 37 }, "same seed keeps its place");
   assert.deepEqual(resume({ song: null, step: 0 }, b), { song: b, step: 0 });
+  for (const step of [1, 7, 15, 16, 200]) assert.deepEqual(resume({ song: a, step }, b), { song: b, step: 0 }, "mid-bar step " + step);
+  assert.notEqual(a2, a, "compose returns a fresh object each time");
 });
