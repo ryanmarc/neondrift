@@ -17,7 +17,7 @@ import * as storage from "../core/storage.js";
 import { whenReady } from "./context.js";
 
 import { on } from "../core/events.js";
-import { compose, advance, STEPS_PER_BAR, TOTAL_STEPS, BASS_PUSH } from "./compose.js";
+import { compose, advance, resume, STEPS_PER_BAR, TOTAL_STEPS, BASS_PUSH } from "./compose.js";
 
 const KEY = "neondrift:music";
 // Schedule well ahead: browsers throttle timers in background tabs to once a
@@ -182,8 +182,12 @@ function schedule() {
 
 function start() {
   if (timer || !ready) return;
+  // A song parked while the music was off is taken now, not at the next bar
+  // line — there is no beat to keep. The fallback covers start() before any
+  // geometry-loaded.
+  cur = resume(cur, pending); pending = null;
   if (!cur.song) cur = { song: compose(FALLBACK_SEED), step: 0 };
-  filter.Q.value = cur.song.voice.q;
+  filter.Q.setValueAtTime(cur.song.voice.q, ctx.currentTime);
   nextTime = ctx.currentTime + 0.05;
   timer = setInterval(schedule, TICK_MS);
   applyMix(0.3);

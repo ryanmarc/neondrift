@@ -189,3 +189,12 @@ test("500 seeds: lead notes on beats 1 and 3 are chord tones", () => {
     }
   }
 });
+
+test("resume takes a pending song at once, from its bar 1", () => {
+  const { resume } = C;
+  const a = compose("a"), b = compose("b"), a2 = compose("a");
+  assert.deepEqual(resume({ song: a, step: 37 }, b), { song: b, step: 0 });
+  assert.deepEqual(resume({ song: a, step: 37 }, null), { song: a, step: 37 });
+  assert.deepEqual(resume({ song: a, step: 37 }, a2), { song: a, step: 37 }, "same seed keeps its place");
+  assert.deepEqual(resume({ song: null, step: 0 }, b), { song: b, step: 0 });
+});

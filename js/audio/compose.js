@@ -259,3 +259,13 @@ export function advance(state, pending) {
   if (fresh && state.step % STEPS_PER_BAR === 0) return { song: pending, step: 0, swapped: true };
   return { song: state.song, step: state.step, swapped: false };
 }
+
+/**
+ * The state to start (or restart) the sequencer from. Music that was off has
+ * no bar line to wait for, so a pending song for another track is taken at
+ * once, from its bar 1; the same seed keeps its place.
+ */
+export function resume(state, pending) {
+  if (pending && !(state.song && pending.seed === state.song.seed)) return { song: pending, step: 0 };
+  return { song: state.song, step: state.step };
+}
