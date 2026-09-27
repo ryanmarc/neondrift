@@ -37,7 +37,8 @@ function card(id) {
 }
 
 function showOffer({ cleared, bonus, mods }) {
-  $offerhead.textContent = "STAGE " + cleared + " CLEAR · +" + (Number.isInteger(bonus) ? bonus : bonus.toFixed(1)) + "s";
+  $offerhead.textContent = "STAGE " + cleared + " CLEAR · +" + (Number.isInteger(bonus) ? bonus : bonus.toFixed(1)) + "s"
+    + (track.wet ? " · NEXT STAGE: WET" : "");
   $cards.innerHTML = mods.map(card).join("") + card(SKIP.id);
   $runover.classList.remove("on");
   $offer.classList.add("on");

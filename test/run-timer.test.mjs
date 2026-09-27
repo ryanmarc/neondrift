@@ -5,6 +5,7 @@ const root = new URL("../js/", import.meta.url);
 const { T, PHYSICS_DT } = await import(new URL("config/tuning.js", root));
 const { SLIDING, WENT_OFF, OFF_FREE } = await import(new URL("game/dynamics.js", root));
 const { buildFrom } = await import(new URL("run/mods.js", root));
+const { track } = await import(new URL("track/track.js", root));
 const { TIMER, drainRate, capFor, tickTimer, addBonus, addLump } = await import(new URL("run/timer.js", root));
 
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, a + " ≠ " + b);
@@ -33,6 +34,25 @@ test("refills only while SLIDING and only above the refill floor", () => {
   const r2 = fresh({ build: buildFrom(["roller"]) });
   second(r2, SLIDING, carAt(2));
   assert.ok(r2.timer > TIMER.start, "×2 with roller refills faster");
+});
+
+test("a wet track scales the slide refill by TIMER.wetGain, not the drain", () => {
+  assert.notEqual(TIMER.wetGain, 1, "the balance test tuned this off 1; a no-op multiplier would defeat this test");
+  track.wet = false;
+  const dry = fresh();
+  const dryDrain = dry.timer - drainRate(dry.stage, dry.build) * PHYSICS_DT;
+  tickTimer(dry, SLIDING, carAt(2), PHYSICS_DT);
+  const dryRefill = dry.timer - dryDrain;
+
+  track.wet = true;
+  const wet = fresh();
+  const wetDrain = wet.timer - drainRate(wet.stage, wet.build) * PHYSICS_DT;
+  tickTimer(wet, SLIDING, carAt(2), PHYSICS_DT);
+  const wetRefill = wet.timer - wetDrain;
+  track.wet = false;
+
+  close(dryDrain, wetDrain, 1e-9);
+  close(wetRefill, dryRefill * TIMER.wetGain);
 });
 
 test("a ×4 chain out-earns stage-1 drain; a ×1 slide roughly breaks even", () => {

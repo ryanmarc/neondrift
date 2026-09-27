@@ -4,11 +4,12 @@
 import { $ } from "../core/dom.js";
 import { run } from "../run/state.js";
 import { TIMER, capFor } from "../run/timer.js";
+import { track } from "../track/track.js";
 
 const $runstage = $("runstage"), $runbest = $("runbest"), $runtimer = $("runtimer"), $timefill = $("timefill");
 
 export function updateRunHud() {
-  $runstage.textContent = "STAGE " + run.stage;
+  $runstage.textContent = "STAGE " + run.stage + (track.wet ? " · WET" : "");
   $runbest.textContent = run.bestDay ? "best: stage " + run.bestDay.stages : "";
   const low = run.timer <= TIMER.low;
   // Blindfold hides the clock until it is low; then the warning shows, not the number.

@@ -4,6 +4,7 @@
 // is deterministic and replayable.
 
 import { SLIDING, WENT_OFF, OFF_FREE } from "../game/dynamics.js";
+import { track } from "../track/track.js";
 
 export const TIMER = {
   start: 20,      // seconds on the clock at stage 1
@@ -15,6 +16,9 @@ export const TIMER = {
   knee: 8,        // The knee is what keeps a single wall survivable; the creep is what makes
                   // every run end. A capped drain let a chain-keeping build refill forever.
   refill: 1.8,    // slide refill gain — see tickTimer for the formula
+  wetGain: 0.90,  // refill multiplier on a wet stage — the drive slides more on wet (lower
+                  // grip, slower recovery), so the raw refill overshoots dry by ~150%;
+                  // this brings it back within test/wet-run.test.mjs's ±10% band.
   bonus: 5,       // seconds for clearing a stage (× build.bonus)
   low: 5,         // "timer-low" fires crossing down through this; re-arms above low + 2
   skip: 4,        // what the Skip card pays (× build.skip)
@@ -44,7 +48,8 @@ export function tickTimer(run, flags, car, dt) {
   let t = run.timer - dt * drainRate(run.stage, b);
   if ((flags & SLIDING) && car.mult >= b.refillFloorMult) {
     const speed = Math.hypot(car.vx, car.vy);
-    t += dt * TIMER.refill * car.drift * Math.min(1, speed / b.T.maxSpeed) * car.mult * b.refill;
+    t += dt * TIMER.refill * car.drift * Math.min(1, speed / b.T.maxSpeed) * car.mult * b.refill
+      * (track.wet ? TIMER.wetGain : 1);
   }
   if ((flags & WENT_OFF) && !(flags & OFF_FREE) && b.offTax) t -= b.offTax;
   t = Math.min(t, capFor(b));
