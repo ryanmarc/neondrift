@@ -94,6 +94,7 @@ function refreshSeed() {
   let tag = "";
   if (ago == null) tag = ' <span class="override">override</span>';
   else if (ago !== "today") tag = ' <span class="ago">' + ago + "</span>";
+  if (track.wet) tag += ' <span class="wet">wet</span>';
   $seed.innerHTML = "TRACK " + esc(track.seed) + " / " + esc(track.id).toUpperCase() + tag;
   $dayprev.disabled = !canGoDay(-1);
   $daynext.disabled = !canGoDay(1);

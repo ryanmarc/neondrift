@@ -36,6 +36,9 @@ below works with it unchanged.
   leaderboard panel, which appears once you have a posted time.
 - `?guides` — show the drift guide markers. Turning guides on also computes
   the optimal line for the track (see below) and switches the markers to it.
+- `?weather=wet|dry` — force the weather for testing. A forced run is
+  practice: not saved as a best, not posted (the worker replays on the seed's
+  own weather).
 
 ## Constraints — keep these
 
@@ -105,6 +108,13 @@ relatively, or inline it as a `data:` URI.
   selectable. Opening one sets that rival and shows "NAME#tag challenges you
   to beat 39.97." above the race button (the `challenge` event). Your own id
   is ignored. Only your own posted run can be shared — one meaning per link.
+- **Weather.** Seeded ~1 in 5 from `WEATHER_CUTOVER` (2026-10-01) by
+  `track/weather.js`; dailies and each run stage roll independently, so a wet
+  daily says nothing about its stages. `track.wet` makes `integrate()` apply
+  `WET` (grip, recovery, top speed, boost fill) on top of `P`; dry multiplies
+  by 1, pinned by `test/wet-physics.test.mjs`. Rain, a wet road, wheel spray
+  and a rain bed are drawn and synthesized on wet tracks; the offer screen
+  says "NEXT STAGE: WET".
 
 ### Run mode
 
@@ -117,7 +127,10 @@ a rate that ramps steeply over the first stages, knees at about 1.6× by stage
 every run end — a capped drain let a chain-keeping build refill forever. It is
 refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
-keeps you alive, not just finishing laps. Clearing a stage pays `TIMER.bonus`
+keeps you alive, not just finishing laps. On a wet stage the refill is scaled
+again by `TIMER.wetGain` (0.90): a wet drive slides more, so the raw refill
+overshot dry, and `wetGain` brings it back within `test/wet-run.test.mjs`'s
+±10% net-clock band across stages 1–8. Clearing a stage pays `TIMER.bonus`
 seconds, scaled by the build's bonus multiplier. **The chain carries across
 stages**: a run is one continuous drive, so the multiplier you cross the line
 with is the one the next stage starts on (`run.chain`). It has to — the chain
@@ -280,7 +293,8 @@ js/config/  params.js   URL params, TODAY, FIRST_DAY, date-seed helpers, INITIAL
 js/track/   generator.js  trackFromAmps, finishSamples, cornerCount, buildTrack(rng, shape?) — the harmonic generator, pure
             layouts.js    buildDriftTrack(rng, family, shape?): the drift-layout families, closure, drivability — pure
             styles.js     CUTOVER, FAMILIES, styleFor(seed): which generator and family a seed gets — pure
-            track.js      `track` {seed, id, samples, style}, loadTrackGeometry(seed, shape?), nearest
+            weather.js    WEATHER_CUTOVER, weatherFor(seed): "wet" | "dry" for a seed — pure
+            track.js      `track` {seed, id, samples, style, wet}, loadTrackGeometry(seed, shape?), forceWeather, nearest
             guides.js     `guides` {flag, visible, list}, rebuildGuides
 js/game/    state.js    `car`, `race`, resetRace
             daily.js    the daily rollover, and the day browser (gotoDay, gotoToday, canGoDay)
@@ -304,11 +318,13 @@ js/input/   input.js    steer() from pointer halves + arrow keys + gamepad; emit
             gamepad.js  pure: padState(gp) → digital x/y + A/B/LB/RB, risingEdges, firstPad, stepIndex
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
+            rain.js     rainCount(W,H), createRain/stepRain/drawRain — the screen-space rain streaks
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
             sfx.js      effects: update(), engineUpdate(); subscribes to game events; re-exports the context API
             engine.js   the engine: stepEngine(model, input, dt, P) is pure (gears, revs, load); createEngine(ctx, bus) builds the nodes
             music.js    the sequencer: plays a composed song on the audio clock; update(live, boosting) picks the mix
             compose.js  compose(seed) → song: pure, seeded; the pools, the mood, resume() for which song plays next
+            rain.js     wetSkid(slide, wet) — dry vs. wet skid voicing; createRainBed(ctx, bus, noiseBuf) — the rain bed, setWet() ramps it
 js/net/     identity.js secret + name in storage; playerId() = sha256(secret); tag = first 4 hex
             api.js      fetch wrappers for the leaderboard API; every failure resolves to null
             leaderboard.js `board` state; posts runs that beat your posted time; rename; pairing; challenge links; emits board-updated, challenge
@@ -376,6 +392,9 @@ Conventions:
   forward, never rebuild a live day. The worker replays through the same
   `loadTrackGeometry`, so **the worker must be deployed (pushed to `main`)
   before `CUTOVER`**, or posts that day fail with `track-mismatch`.
+  `WEATHER_CUTOVER` (`track/weather.js`) is the same rule for weather: past
+  days never turn wet, and the worker must be on `main` before it too, or a
+  wet day's posts fail replay.
 - **Camera smoothing must be framerate-independent.** Use
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
@@ -480,6 +499,18 @@ Conventions:
 | `slideSpeed` / `boostSteer` / `multSpeed` / `offFree` | Not in `T`: optional keys a run's build sets, read by `integrate()` with stock fallbacks (210, false, 0, 0). Slide speed gate; boost fires while steering; top speed per ×1 of chain; free excursions per stage. |
 | `zoomRange` / `zoomLag` | How far the view pulls back at speed, and seconds to follow a speed change. Set `zoomRange` to 0 to lock the zoom. |
 
+### `WET` — wet-track multipliers
+
+Applied on top of `T` when `track.wet` (`track/weather.js`); dry multiplies
+by exactly 1, so it is bit-identical. Set by `test/wet-physics.test.mjs`.
+
+| Knob | Does what |
+|---|---|
+| `grip` | Scales `gripMax`, `gripSlide` and `stiffness` — less bite everywhere. |
+| `recover` | Scales `chargeDown` — traction comes back slower, so slides last longer. |
+| `speed` | Scales `maxSpeed` and `boostSpeed` — standing water costs top speed. |
+| `fill` | Scales `boostFill` — the longer slides pay a little more boost. |
+
 ### `CAM` — camera feel
 
 | Knob | Does what |
@@ -551,6 +582,11 @@ Facts that the design depends on:
   result is cached in localStorage under `neondrift:t<id>:line:v<LINE_VERSION>-<physics hash>`,
   so changing any `T` constant or bumping `LINE_VERSION` recomputes it.
   Markers are drawn only for the lap being driven.
+- **The cache key carries the weather.** `WET` is folded into the physics
+  hash (retuning it recomputes every wet line), and the key gets a `-w` suffix
+  on a wet track so the same geometry's wet and dry lines never collide. The
+  worker is told the page's weather (`{ seed, wet }`) since it can't read
+  `track.wet` itself.
 
 Benchmarks live outside the repo; the pipeline runs in Node with a two-line
 `location`/`document` stub, since nothing under `sim/` touches the DOM.
@@ -732,3 +768,6 @@ are rejected), validation, and the client identity.
   ~36%) and lap 10–30% longer; no test drives a run through them.
 - **Run ghost.** No stage records or replays a run's own line, unlike the
   daily race's ghost.
+- **Puddles, a drying line, wet-specific mods.** Weather is currently one
+  wet/dry roll per track; standing water in fixed spots, a line that dries
+  over a race, or a run mod that plays with weather are all unbuilt.
