@@ -29,7 +29,7 @@ below works with it unchanged.
   Any string works; it is only ever hashed into the PRNG seed. The title
   screen's day picker (‹ › around the track label) also sets and clears this
   param via `replaceState`, so a past day's URL is shareable.
-- `?seed=random` — a new track every load.
+- `?seed=random` — a new track every load, from a random drift-layout family.
 - `?rival=<player id>` — a challenge link: race that player's posted run on
   the linked seed. Consumed once on load, stored as the track's remembered
   rival, then stripped from the URL. Made by "Challenge a friend" in the
@@ -175,6 +175,84 @@ road): the accepted layout is rebuilt at a larger radius after the search
 (`shape.lapScale`), which never fails and makes every corner gentler by the
 same factor. Scaling before the search lost seeds even at ×1.1.
 
+**Drift layouts (from `CUTOVER`, 2026-09-27).** Research on real drift
+courses is in `docs/research/drift-tracks.md`. Every competition course is a
+long run-up, one big committed entry, a switchback and a tighter corner, and
+the harmonic generator never makes that: its curvature is spread evenly. So
+`js/track/layouts.js` builds a lap from straights and constant-radius arcs,
+from one of six family recipes after real courses: `entry` (Autopolis, a long
+run-up into one huge sweeper), `technical` (Tsukuba: feints, T1, esses,
+hairpin), `bank` (Irwindale: a four-turn oval with a power alley), `loop`
+(Greinbach), `touge` (a hairpin stack climbing away from the straight) and
+`flow` (a club circuit). The family sets the *kind* of lap; the seed draws
+the rest. **Each recipe is a grammar, not a fixed sequence:** its signature
+elements are always there (touge's hairpin stack, entry's run-up into a big
+sweeper, bank's banked ends, loop's reverse hairpin), and how many other
+elements it has, which ones, their order and how the lap's turn is shared
+between them are drawn. Fixed sequences made every track in a family the
+same outline rotated; `test/layouts.test.mjs` measures that (a turning-
+function distance, blind to rotation and start line) and fails a family
+whose tracks are too alike. **Every lap runs clockwise**, as the harmonic generator's
+always has (canvas y points down, so a heading that turns +360° is
+clockwise); `test/layouts.test.mjs` checks both generators.
+
+- **Which family.** The dailies walk shuffled blocks of all six: never the
+  same family two days running, all six in every block of six days. A run's
+  stages walk their own blocks seeded by the day, never repeating back to
+  back, and stage 1 never matches that day's daily.
+- **Closure.** Same-direction corners are scaled so the lap turns 360°, then
+  a Gauss–Newton solve changes straight lengths and those corners' angles by
+  the smallest relative amount to meet the start (weights L² and φ²). A
+  leftover under 4% of the lap is sheared out and resampled by arc length.
+- **Drivability was measured, not assumed.** The car has no brake and thrust
+  is always on, so on stadium tracks no controller holds a 180° hairpin
+  tighter than ~400px whatever the straight before it. `drivableR(φ)` is the
+  widest-line bound (R − W + 2W/(1 − cos φ/2) ≥ 560, W 100): a right angle can
+  be tight, a hairpin can't. Same-direction corners under 250px apart count
+  as one corner; opposite corners tighter than 450px need 260px between them
+  (traction recovery). With those rules the optimiser's controllers drive
+  every family clean, and the full line search is feasible.
+- **Every lap must be worth drifting.** A lap turns 360° just to close, so
+  a corner count can be met by gentle bends that barely need a slide (a flow
+  daily once turned 445° with two direction changes). `busyness()` requires
+  360 + 40° per target corner of total turning (680° for a daily) and a
+  direction change per three target corners; late gauntlet stages ask for
+  more corners but not a busier bar. A family that can't reach it keeps its
+  busiest drivable layout; every family's calmest daily turns ~680–730°
+  against ~484° for the harmonic generator. Flow always has two or three
+  real turn-backs (a corner against the lap between two with it).
+- **Race length.** At eight corners the optimal three-lap time is 39–49s
+  (the harmonic generator's is ~37s), so a slow race can run past 75s. The
+  worker's ceiling is 90s for that reason: `validTime`, the ghost cap in
+  `validGhost` (10,800 numbers = 90s at 30Hz) and the replay cap
+  `MAX_SECONDS` in `worker/src/replay.js` are one number and move together.
+- **Build cost.** The worker builds tracks too, so the search is bounded:
+  the busyness bar is checked before the costly sample, a coarse 60px
+  outline rejects overlaps first, and a family already holding a
+  best-effort layout stops after 200 tries (300 for the busyness fallback).
+  Median build 1.3ms, worst ~13ms across 180 days (harmonic: 1.7 / 2.7ms).
+- **Clearance.** Two points far apart along the road but under 420px apart
+  in space reject the layout, so stretches never touch.
+- **Length.** Each family has its own lap target (`LAP`) so all lap in about
+  the harmonic generator's time: slow families get shorter laps. No lap is
+  longer than `LAP_CAP` (12,000px), whatever its extras. The start
+  line sits 30% along the longest straight: every race starts on a run-up.
+- **Corners: the daily is as busy as a late stage.** A daily asks for
+  `DAILY_CORNERS` (8) corners, where the gauntlet ramps 4 → 9. Extra corners
+  are family-specific and never disturb the lap's closure: `technical` gets
+  longer runs of esses (`symEsses`: mirror-symmetric, turns solved to cancel,
+  so the run ends on the line it started); `loop` gets more lobes of its
+  middle (a corner with the lap, a reverse hairpin, an opening turn), which
+  take the fast chicane's road; the rest get a symmetric three-corner bump.
+  Each extra earns 6% more lap (12% for a loop lobe); the rest of its road
+  comes out of the main straights. The target is best-effort: entry,
+  technical, touge and flow meet it; bank and loop average about 7.4–8.5 and
+  return their most-cornered drivable layout. Eight, not nine, because entry
+  adds corners three at a time and nine made it eleven.
+- **Fallback.** If no candidate passes in 400 tries the harmonic generator
+  runs on the same rng; across 2,100 seeds it never did. (Technical accepts
+  about 3% of tries, so 200 wasn't quite enough.)
+
 Score is stages cleared, then progress into the stage that ended it — not
 time. Bests are local only, per day and all-time, in `localStorage`; there is
 no board, no ghost and no optimal line for a stage. The run has three sounds
@@ -199,8 +277,10 @@ js/core/    math.js     clamp, lerp, TAU, wrapAngle
             dom.js      $(id)
 js/config/  params.js   URL params, TODAY, FIRST_DAY, date-seed helpers, INITIAL_SEED, GUIDES_FLAG
             tuning.js   T, CAM, GUIDE, LAPS, PHYSICS_DT, GHOST_HZ, T_TICK, T_GO, road size
-js/track/   generator.js  trackFromAmps, cornerCount, buildTrack(rng, shape?) — pure
-            track.js      `track` {seed, id, samples}, loadTrackGeometry(seed, shape?), nearest
+js/track/   generator.js  trackFromAmps, finishSamples, cornerCount, buildTrack(rng, shape?) — the harmonic generator, pure
+            layouts.js    buildDriftTrack(rng, family, shape?): the drift-layout families, closure, drivability — pure
+            styles.js     CUTOVER, FAMILIES, styleFor(seed): which generator and family a seed gets — pure
+            track.js      `track` {seed, id, samples, style}, loadTrackGeometry(seed, shape?), nearest
             guides.js     `guides` {flag, visible, list}, rebuildGuides
 js/game/    state.js    `car`, `race`, resetRace
             daily.js    the daily rollover, and the day browser (gotoDay, gotoToday, canGoDay)
@@ -288,6 +368,14 @@ Conventions:
   shape must draw the same rng values and accept the same candidate as it
   always has, or every stored track id, ghost and leaderboard time is orphaned.
   `test/run-ramp.test.mjs` pins one daily id; only the run passes a shape.
+- **Past days never change generator.** `styleFor(seed)` in
+  `track/styles.js` gives date seeds before `CUTOVER` (and their run stages,
+  and custom seed strings) the harmonic generator, and everything from
+  `CUTOVER` on a drift layout. The drift generator is pinned the same way
+  (`test/layouts.test.mjs` pins its first days): to change it, move `CUTOVER`
+  forward, never rebuild a live day. The worker replays through the same
+  `loadTrackGeometry`, so **the worker must be deployed (pushed to `main`)
+  before `CUTOVER`**, or posts that day fail with `track-mismatch`.
 - **Camera smoothing must be framerate-independent.** Use
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
@@ -523,6 +611,7 @@ Wrap every read in try/catch and render correctly when storage is empty.
   monotonically increasing angles almost guarantee same-direction corners only.
   Generator rejects layouts with min radius < 185px or fewer than 4 direction
   changes; a run's stages add a corner floor on top (see the track ramp).
+  Days before `CUTOVER` still use it; later days use the drift layouts below.
 - **Audio levels were solved, not eyeballed.** Gains are balanced by A-weighted
   loudness through a phone-speaker rolloff. Raw gain numbers are misleading: a
   Q=12 bandpass passes ~75Hz of bandwidth, so `0.4` of that is far quieter than
@@ -636,5 +725,10 @@ are rejected), validation, and the client identity.
   no branching path through a stage.
 - **Longer laps for later stages.** The ramp adds corners; the base radius
   (lap length) is the same at every stage and would be a second knob.
+- **The layout family on screen.** `track.style` names the family (touge,
+  bank…); nothing shows it yet.
+- **Run balance on drift layouts.** The run's timer was tuned on harmonic
+  stages. Drift layouts slide for a larger share of the lap (27–57% against
+  ~36%) and lap 10–30% longer; no test drives a run through them.
 - **Run ghost.** No stage records or replays a run's own line, unlike the
   daily race's ghost.

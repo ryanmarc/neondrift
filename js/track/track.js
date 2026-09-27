@@ -4,6 +4,8 @@ import { clamp } from "../core/math.js";
 import { mulberry32, hashStr } from "../core/random.js";
 import { emit } from "../core/events.js";
 import { buildTrack } from "./generator.js";
+import { buildDriftTrack } from "./layouts.js";
+import { styleFor } from "./styles.js";
 import { HALF_W } from "../config/tuning.js";
 
 /**
@@ -17,12 +19,20 @@ export const track = {
   samples: [],
   length: 0,
   halfW: HALF_W,   // road half-width in px; a run's road mods scale it, loadTrackGeometry resets it
+  style: "classic",  // the layout family (layouts.js), or "classic" for the harmonic generator
 };
 
-/** Rebuild the track from a seed string. `shape` (optional) is the generator's target — the run's ramp. */
+/**
+ * Rebuild the track from a seed string. `shape` (optional) is the generator's
+ * target — the run's ramp. styleFor(seed) picks the generator: a drift layout
+ * family from CUTOVER on, the harmonic generator for earlier days and custom
+ * seeds, whose ids key every stored ghost and leaderboard row.
+ */
 export function loadTrackGeometry(seed, shape) {
   const rng = mulberry32(hashStr(seed));
-  const built = buildTrack(rng, shape);
+  const family = styleFor(seed);
+  const built = family ? buildDriftTrack(rng, family, shape) : buildTrack(rng, shape);
+  track.style = built.family || "classic";
   track.seed = seed;
   track.samples = built.S;
   track.length = built.length;

@@ -31,6 +31,15 @@ export function trackFromAmps(R0, amps) {
     const a = raw[j], b = raw[(j + 1) % M];
     S.push({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) });
   }
+  return finishSamples(S, total);
+}
+
+/**
+ * Tangent, normal and signed curvature for every sample of a closed,
+ * evenly spaced centreline, plus the tightest radius and how often the turn
+ * direction flips. Shared by the harmonic generator and the drift layouts.
+ */
+export function finishSamples(S, length) {
   // tangent + normal
   for (let i = 0; i < S.length; i++) {
     const a = S[(i - 1 + S.length) % S.length], b = S[(i + 1) % S.length];
@@ -49,7 +58,7 @@ export function trackFromAmps(R0, amps) {
     if (s && prev && s !== prev) flips++;
     if (s) prev = s;
   }
-  return { S, length: total, minR, flips };
+  return { S, length, minR, flips };
 }
 
 /**
