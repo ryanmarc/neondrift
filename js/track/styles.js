@@ -18,7 +18,7 @@ export const FAMILIES = ["entry", "technical", "bank", "loop", "touge", "flow"];
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Whole days since 1970-01-01 for a real zero-padded UTC date, else null. */
-function dayNumber(s) {
+export function dayNumber(s) {
   const m = DATE_RE.exec(s);
   if (!m) return null;
   const ms = Date.UTC(+m[1], +m[2] - 1, +m[3]);
