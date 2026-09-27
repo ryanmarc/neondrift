@@ -38,7 +38,7 @@ export function createRainBed(ctx, bus, noiseBuf) {
   src.connect(skidF); skidF.connect(skidG); skidG.connect(bus);
 
   src.start();
-  const BED = 0.05;   // A-weighted through the phone rolloff, well under the engine — see Step 6
+  const BED = 0.015;   // A-weighted through the phone rolloff, ~8dB under the engine's cruise level — see Step 6
   return {
     setWet(wet) { bed.gain.setTargetAtTime(wet ? BED : 0, ctx.currentTime, 0.6); },
     hiss(gain) { skidG.gain.setTargetAtTime(gain, ctx.currentTime, 0.05); },

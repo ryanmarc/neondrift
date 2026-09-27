@@ -10,7 +10,7 @@
 //   race-start
 //   race-finish ({ time, prevBest, isPB, ghost, inputs, practice }) – practice is true for a ?weather override: not saved, not posted
 //   track-loaded
-//   geometry-loaded ({ seed, id }) – any geometry load, daily or run stage (track/track.js); the music composes on it
+//   geometry-loaded ({ seed, id, wet }) – any geometry load, daily or run stage (track/track.js); the music composes on it
 //   input-mode ("pointer" | "keys" | "pad")
 //   board-updated       – leaderboard state changed (net/leaderboard.js)
 //   line-updated        – optimal line status changed (sim/line.js)
