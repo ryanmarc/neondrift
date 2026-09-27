@@ -119,6 +119,29 @@ test("the worker replays a wet run on a wet road to the identical time", () => {
   assert.equal(r.time, run.time);
 });
 
+test("the same inputs do NOT replay to the wet time on the same geometry dry", async () => {
+  let wetDay = null;
+  for (let n = 0; n < 60 && !wetDay; n++) {
+    const d = new Date(Date.UTC(2026, 9, 1 + n)).toISOString().slice(0, 10);
+    if (weatherFor(d) === "wet") wetDay = d;
+  }
+  loadTrackGeometry(wetDay);
+  const run = recordInputs();
+  // replay.js caches a track by seed and always restores that seed's weather
+  // from the cache (see the next test), so forcing dry here and calling the
+  // module's own trackFor/replay wouldn't change anything for wetDay once
+  // it's cached — and the tests above already cached it wet. Re-importing
+  // replay.js under a distinct specifier gives it a fresh, empty cache of its
+  // own while still sharing track.js's live `forced` flag, so this rebuilds
+  // the identical geometry (loadTrackGeometry doesn't depend on weather) but
+  // dry.
+  const { replay: replayDry } = await import(new URL("../worker/src/replay.js?dry-negative", import.meta.url));
+  forceWeather("dry");
+  const r = replayDry(wetDay, run.inputs, { claimedTime: run.time });
+  forceWeather(null);
+  assert.ok(!r.ok || r.time !== run.time, "wet-tuned inputs shouldn't reproduce the wet time on a dry road");
+});
+
 test("trackFor restores the weather from its cache", () => {
   let wetDay = null;
   for (let n = 0; n < 60 && !wetDay; n++) {
