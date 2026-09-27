@@ -1,5 +1,8 @@
-// Stage seeds, the track ramp, scores and the storage keys. Pure.
+// Stage seeds, the track ramp, scores and the storage keys. Pure, except
+// commitScore's writes — kept here so a run's save logic can be tested
+// without pulling in run.js's whole module graph (game/race.js, the UI).
 
+import * as storage from "../core/storage.js";
 import { TIMER } from "./timer.js";
 
 /** Stage n of a day is its own track: a distinct geometry from the daily one and every other stage. */
@@ -39,3 +42,18 @@ export function parseBest(json) {
 
 export const bestKeyDay = day => "neondrift:run:" + day + ":best";
 export const BEST_KEY_ALL = "neondrift:run:best";
+
+/**
+ * Save a run-over score as the day's/all-time best if it beats them, unless
+ * persist is false (a ?weather override run: practice, nothing saved).
+ * Mirrors commitRun's shape (game/ghost.js). Mutates run.bestDay/run.bestAll.
+ */
+export function commitScore(run, score, persist = true) {
+  const isBest = persist && beats(score, run.bestDay);
+  if (isBest) { run.bestDay = score; storage.write(bestKeyDay(run.day), JSON.stringify(score)); }
+  if (persist && beats(score, run.bestAll)) {
+    run.bestAll = { ...score, day: run.day };
+    storage.write(BEST_KEY_ALL, JSON.stringify(run.bestAll));
+  }
+  return { isBest, practice: !persist };
+}

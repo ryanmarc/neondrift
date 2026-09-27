@@ -60,10 +60,16 @@ function modList(picks) {
   return [...seen].map(([id, n]) => esc(byId.get(id).name) + (n > 1 ? " ×" + n : "")).join(" · ");
 }
 
-function showRunOver({ score, best, isBest }) {
+function showRunOver({ score, best, isBest, practice }) {
   $roscore.textContent = "STAGE " + score.stages;
-  $robest.textContent = isBest ? "New best for the day." : (best ? "Best today: stage " + best.stages : "");
-  $robest.classList.toggle("new", isBest);
+  if (practice) {
+    // ?weather override: nothing was saved, so the copy must not claim a best.
+    $robest.textContent = "Practice — forced weather. Not saved.";
+    $robest.classList.remove("new");
+  } else {
+    $robest.textContent = isBest ? "New best for the day." : (best ? "Best today: stage " + best.stages : "");
+    $robest.classList.toggle("new", isBest);
+  }
   $romods.innerHTML = modList(score.picks);
   $offer.classList.remove("on");
   $runover.classList.add("on");

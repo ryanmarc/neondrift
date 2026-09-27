@@ -5,7 +5,7 @@
 
 import { emit } from "../core/events.js";
 import * as storage from "../core/storage.js";
-import { todayUtc } from "../config/params.js";
+import { todayUtc, WEATHER_PARAM } from "../config/params.js";
 import { HALF_W } from "../config/tuning.js";
 import { track, loadTrackGeometry } from "../track/track.js";
 import { guides } from "../track/guides.js";
@@ -17,7 +17,7 @@ import { run } from "./state.js";
 import { buildFrom, canPick, SKIP } from "./mods.js";
 import { offerFor } from "./offer.js";
 import { TIMER, tickTimer, addBonus, addLump } from "./timer.js";
-import { stageSeed, stageShape, beats, parseBest, bestKeyDay, BEST_KEY_ALL } from "./stages.js";
+import { stageSeed, stageShape, parseBest, bestKeyDay, BEST_KEY_ALL, commitScore } from "./stages.js";
 
 let savedGuides = false;
 
@@ -76,14 +76,9 @@ function stageClear() {
 function runOver() {
   run.over = true;
   const score = { stages: run.stage - 1, prog: car.prog, picks: run.picks.slice() };
-  const isBest = beats(score, run.bestDay);
-  if (isBest) { run.bestDay = score; storage.write(bestKeyDay(run.day), JSON.stringify(score)); }
-  if (beats(score, run.bestAll)) {
-    run.bestAll = { ...score, day: run.day };
-    storage.write(BEST_KEY_ALL, JSON.stringify(run.bestAll));
-  }
+  const { isBest, practice } = commitScore(run, score, WEATHER_PARAM == null);
   setRules(null);
-  emit("run-over", { score, best: run.bestDay, isBest, picks: run.picks.slice() });
+  emit("run-over", { score, best: run.bestDay, isBest, picks: run.picks.slice(), practice });
 }
 
 /** Start a run on `day` (default today) from stage 1, with the countdown. */
