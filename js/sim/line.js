@@ -6,7 +6,7 @@
 import { on, emit } from "../core/events.js";
 import * as storage from "../core/storage.js";
 import { hashStr } from "../core/random.js";
-import { T, LAPS, PHYSICS_DT } from "../config/tuning.js";
+import { T, WET, LAPS, PHYSICS_DT } from "../config/tuning.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { LINE_VERSION } from "./optimizer.js";
@@ -21,16 +21,20 @@ export const line = {
   progress: 0,        // 0..1
 };
 
-const PHYSICS_HASH = hashStr(JSON.stringify(T) + "|" + LAPS + "|" + PHYSICS_DT).toString(36);
-const cacheKey = (id) => "neondrift:t" + id + ":line:v" + LINE_VERSION + "-" + PHYSICS_HASH;
+// WET is in the hash so retuning it recomputes wet lines; the "-w" suffix keeps
+// a wet road's line apart from the same geometry's dry one (?weather forces it).
+const PHYSICS_HASH = hashStr(JSON.stringify(T) + "|" + JSON.stringify(WET) + "|" + LAPS + "|" + PHYSICS_DT).toString(36);
+export const lineKey = (id, wet) => "neondrift:t" + id + ":line:v" + LINE_VERSION + "-" + PHYSICS_HASH + (wet ? "-w" : "");
 
 let worker = null;
+let lineWet = null;
 
 /** Make sure a line exists (or is being computed) for the current track. */
 export function ensureLine() {
-  if (line.trackId === track.id && line.status !== "idle") return;
+  if (line.trackId === track.id && lineWet === track.wet && line.status !== "idle") return;
   line.trackId = track.id;
-  const cached = storage.read(cacheKey(track.id));
+  lineWet = track.wet;
+  const cached = storage.read(lineKey(track.id, track.wet));
   if (cached) {
     try { apply(JSON.parse(cached)); return; } catch { /* corrupt: recompute */ }
   }
@@ -48,7 +52,7 @@ function compute() {
   line.time = null; line.feasible = false; line.markers = [];
   emit("line-updated");
   if (worker) worker.terminate();
-  const id = track.id;
+  const id = track.id, wet = track.wet;
   try {
     worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
   } catch (err) {
@@ -62,7 +66,7 @@ function compute() {
       line.time = m.bestTime; line.feasible = m.feasible;
       emit("line-updated");
     } else if (m.type === "done") {
-      storage.write(cacheKey(id), JSON.stringify(m.data));
+      storage.write(lineKey(id, wet), JSON.stringify(m.data));
       apply(m.data);
       worker.terminate(); worker = null;
     }
@@ -72,12 +76,12 @@ function compute() {
     line.status = "failed"; emit("line-updated");
     worker.terminate(); worker = null;
   };
-  worker.postMessage({ seed: track.seed });
+  worker.postMessage({ seed: track.seed, wet: track.wet });
 }
 
 on("track-loaded", () => {
   if (worker) { worker.terminate(); worker = null; }
-  line.status = "idle"; line.trackId = null; line.markers = []; line.time = null; line.feasible = false;
+  line.status = "idle"; line.trackId = null; lineWet = null; line.markers = []; line.time = null; line.feasible = false;
   emit("line-updated");
   if (guides.visible) ensureLine();
 });

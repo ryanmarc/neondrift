@@ -124,3 +124,11 @@ test("trackFor restores the weather from its cache", () => {
   trackFor("2026-09-24");
   assert.equal(track.wet, false);
 });
+
+test("the line cache keeps wet and dry lines apart", async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+  const { lineKey } = await import(new URL("sim/line.js", root));
+  assert.notEqual(lineKey("abc", true), lineKey("abc", false));
+  assert.ok(lineKey("abc", true).startsWith("neondrift:tabc:line:v"));
+  assert.ok(lineKey("abc", true).endsWith("-w"));
+});

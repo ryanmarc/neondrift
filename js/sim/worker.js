@@ -2,7 +2,7 @@
 // and posts progress then the finished markers. No DOM in here — everything it
 // imports is the same pure dynamics the game runs.
 
-import { loadTrackGeometry } from "../track/track.js";
+import { loadTrackGeometry, track } from "../track/track.js";
 import { T } from "../config/tuning.js";
 import { findLine } from "./optimizer.js";
 
@@ -30,8 +30,9 @@ function markersFromToggles(toggles, endTime) {
 }
 
 self.onmessage = (e) => {
-  const { seed } = e.data;
+  const { seed, wet } = e.data;
   loadTrackGeometry(seed);
+  track.wet = wet === true;   // the page's weather, which a ?weather override may have forced
   const r = findLine({
     onProgress: p => self.postMessage({ type: "progress", ...p }),
   });
