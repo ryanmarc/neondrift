@@ -38,7 +38,9 @@ below works with it unchanged.
   the optimal line for the track (see below) and switches the markers to it.
 - `?weather=wet|dry` — force the weather for testing. A forced run is
   practice: not saved as a best, not posted (the worker replays on the seed's
-  own weather).
+  own weather). Practice either way, even when the value matches what the
+  seed would have rolled anyway — the override is a testing tool, and telling
+  that case apart from a real one wasn't worth the code.
 
 ## Constraints — keep these
 
@@ -509,10 +511,17 @@ by exactly 1, so it is bit-identical. Set by `test/wet-physics.test.mjs`.
 
 | Knob | Does what |
 |---|---|
-| `grip` | Scales `gripMax`, `gripSlide` and `stiffness` — less bite everywhere. |
-| `recover` | Scales `chargeDown` — traction comes back slower, so slides last longer. |
-| `speed` | Scales `maxSpeed` and `boostSpeed` — standing water costs top speed. |
-| `fill` | Scales `boostFill` — the longer slides pay a little more boost. |
+| `grip` (0.55) | Scales `gripMax`, `gripSlide` and `stiffness` — less bite everywhere. |
+| `recover` (1.7) | Scales `chargeDown` — traction comes back slower, so slides last longer. |
+| `speed` (0.94) | Scales `maxSpeed` and `boostSpeed` — standing water costs top speed. |
+| `fill` (1.15) | Scales `boostFill` — the longer slides pay a little more boost. |
+
+The four values were set by two bars, not eyeballed: the feel bar (a driven
+lap must move at least one handling metric — lap time, peak speed, slide
+seconds or grip-recovery time — 15% in the wet direction on a fixed seed) and
+the drivability bar (the bootstrap controller must still clear every drift
+layout family clean and finish a 3-lap wet race in under 70s, leaving margin
+under the worker's 90s replay cap). Both are `test/wet-physics.test.mjs`.
 
 ### `CAM` — camera feel
 
@@ -658,6 +667,15 @@ Wrap every read in try/catch and render correctly when storage is empty.
 - **Keep low sounds above ~140Hz.** Phone speakers distort trying to reproduce
   lower, and that distortion is heard as rasp. The boost thump was lowered twice
   chasing "more subtle" and got worse each time; raising it fixed it.
+- **The rain bed's level was measured against the engine, not eyeballed.**
+  `js/audio/rain.js`'s `BED` (0.015) sits the wet bed's hiss+patter about
+  7.7dB under the engine's steady-cruise level, both run through the same
+  400Hz-highpass-then-lowpass phone-rolloff weighting `test/measure-rain-level.mjs`
+  uses. That script needs `OfflineAudioContext`, which only exists in a
+  browser — it isn't a `node --test` file; run it from the served page's
+  console (the file's own header has the two-line snippet). A rain bed loud
+  enough to compete with the engine would drown the cue that says "you're
+  sliding"; this keeps it a bed.
 - **The engine is gears, load and pulses, not a pitch that tracks speed.**
   The first version was two sawtooths pitched by speed through a lowpass: a
   synth pad following a number, and it read as a constant high whine even
