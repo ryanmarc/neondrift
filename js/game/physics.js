@@ -10,6 +10,7 @@ import { T, GHOST_HZ } from "../config/tuning.js";
 import { steer } from "../input/input.js";
 import { car, race } from "./state.js";
 import { integrate, BOOST_IGNITED, WENT_OFF, SLIDING } from "./dynamics.js";
+import { track } from "../track/track.js";
 
 export function step(dt) {
   const speed = Math.hypot(car.vx, car.vy);   // entry speed, for the off-track cues
@@ -53,6 +54,15 @@ export function step(dt) {
   }
   for (const pt of race.trail) pt.l -= dt * 3.2;
   while (race.trail.length && race.trail[0].l <= 0) race.trail.shift();
+
+  // Wet road: the rear wheels throw mist while sliding or boosting, dropped in
+  // world space like the plume so it trails along the path actually driven.
+  if (track.wet && ((flags & SLIDING) || car.boosting) && race.spray.length < 60 && Math.random() < 0.5) {
+    const th = Math.cos(car.a), tv = Math.sin(car.a), side = Math.random() < 0.5 ? -1 : 1;
+    race.spray.push({ x: car.x - th * 12 - tv * 9 * side, y: car.y - tv * 12 + th * 9 * side, l: 1 });
+  }
+  for (const s of race.spray) s.l -= dt * 1.6;
+  while (race.spray.length && race.spray[0].l <= 0) race.spray.shift();
 
   const marks = race.marks;
   for (let i = marks.length - 1; i >= 0; i--) { marks[i].l -= dt * 0.055; if (marks[i].l <= 0) marks.splice(i, 1); }

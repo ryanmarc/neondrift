@@ -10,6 +10,7 @@ import { line } from "../sim/line.js";
 import { car, race } from "../game/state.js";
 import { ghost, ghostAt } from "../game/ghost.js";
 import { camera, updateCamera } from "./camera.js";
+import { createRain, rainCount, stepRain, drawRain } from "./rain.js";
 
 const COLOR = {
   void: "#05060b", grid: "#101a2e", road: "#0a0d18",
@@ -20,6 +21,7 @@ const COLOR = {
   ghostBody: "rgba(47,227,255,.30)", ghostGlow: "rgba(47,227,255,.07)",
   rivalBody: "rgba(255,47,158,.45)", rivalGlow: "rgba(255,47,158,.10)",
   offTint: "rgba(255,47,158,.10)",
+  roadWet: "#070914", tireMarkWet: "rgba(165,190,245,.07)", spray: "232,240,255",
 };
 const EDGES = [[1, COLOR.ice], [-1, COLOR.rose]];   // [side, colour]
 const GRID = 260;
@@ -28,6 +30,7 @@ const stage = $("stage");
 const canvas = $("c");
 const cx = canvas.getContext("2d");
 let W = 0, H = 0, DPR = 1;
+let rain = null; let camPX = 0, camPY = 0;
 
 /** Match the canvas to the stage size and device pixel ratio (capped at 2). */
 export function resize() {
@@ -102,9 +105,24 @@ export function draw(dt, alpha) {
     drawCar(gp.x, gp.y, gp.a, rival ? COLOR.rivalBody : COLOR.ghostBody, rival ? COLOR.rivalGlow : COLOR.ghostGlow, true);
   }
 
+  if (track.wet) {   // the underglow on wet asphalt: a soft pool under the car
+    cx.fillStyle = car.boosting ? "rgba(255,197,61,.10)" : "rgba(47,227,255,.08)";
+    cx.beginPath(); cx.ellipse(rx, ry, 34, 22, ra, 0, Math.PI * 2); cx.fill();
+  }
   drawPlume();
+  drawSpray();
   drawCar(rx, ry, ra, COLOR.paper, car.boosting ? COLOR.amber : COLOR.ice, false);
   cx.restore();
+
+  if (track.wet) {
+    const n = rainCount(W, H);
+    if (!rain || rain.drops.length !== n * 3) rain = createRain(n);
+    // camera velocity in screen px/s, so the drops drift against the motion
+    const vx = dt > 0 ? (camera.x - camPX) * camera.z / dt : 0, vy = dt > 0 ? (camera.y - camPY) * camera.z / dt : 0;
+    stepRain(rain, W, H, Math.min(dt, 0.05), vx, vy);
+    drawRain(cx, rain);
+  }
+  camPX = camera.x; camPY = camera.y;
 
   if (car.off) { cx.fillStyle = COLOR.offTint; cx.fillRect(0, 0, W, H); }
 }
@@ -118,7 +136,7 @@ function drawGrid(bx0, bx1, by0, by1) {
 
 function drawRoad(runs) {
   cx.lineCap = "round"; cx.lineJoin = "round";
-  cx.strokeStyle = COLOR.road; cx.lineWidth = track.halfW * 2;
+  cx.strokeStyle = track.wet ? COLOR.roadWet : COLOR.road; cx.lineWidth = track.halfW * 2;
   for (const run of runs) {
     if (run.length < 2) continue;
     cx.beginPath(); cx.moveTo(run[0].x, run[0].y);
@@ -130,7 +148,7 @@ function drawRoad(runs) {
 function drawTireMarks(inView) {
   const marks = race.marks;
   if (!marks.length) return;
-  cx.lineWidth = 8; cx.strokeStyle = COLOR.tireMark; cx.beginPath();
+  cx.lineWidth = 8; cx.strokeStyle = track.wet ? COLOR.tireMarkWet : COLOR.tireMark; cx.beginPath();
   for (const m of marks) {
     if (!inView(m.x, m.y)) continue;
     const nx = -Math.sin(m.a) * 11, ny = Math.cos(m.a) * 11;
@@ -141,6 +159,22 @@ function drawTireMarks(inView) {
 }
 
 function drawEdges(runs) {
+  if (track.wet) {
+    cx.globalAlpha = 0.07; cx.lineWidth = 46;
+    for (const [sign, col] of EDGES) {
+      cx.strokeStyle = col;
+      for (const run of runs) {
+        if (run.length < 2) continue;
+        cx.beginPath();
+        for (let i = 0; i < run.length; i++) {
+          const s = run[i], o = (track.halfW - 20) * sign, X = s.x + s.nx * o, Y = s.y + s.ny * o;
+          i ? cx.lineTo(X, Y) : cx.moveTo(X, Y);
+        }
+        cx.stroke();
+      }
+    }
+    cx.globalAlpha = 1;
+  }
   cx.lineWidth = 4;
   for (const [sign, col] of EDGES) {
     cx.strokeStyle = col; cx.shadowColor = col; cx.shadowBlur = 18;
@@ -208,6 +242,15 @@ function drawPlume() {
       cx.lineWidth = (3 + 16 * t) * (wide ? 2.4 : 1);
       cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
     }
+  }
+}
+
+// Wet-road mist from the rear wheels (see physics.js): soft pale puffs that grow as they fade.
+function drawSpray() {
+  for (const s of race.spray) {
+    const life = Math.max(0, s.l);
+    cx.fillStyle = "rgba(" + COLOR.spray + "," + (0.10 * life).toFixed(3) + ")";
+    cx.beginPath(); cx.arc(s.x, s.y, 8 + 22 * (1 - life), 0, Math.PI * 2); cx.fill();
   }
 }
 

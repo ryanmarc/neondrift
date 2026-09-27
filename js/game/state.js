@@ -18,6 +18,7 @@ export const race = {
   marks: [],        // tire marks [{x, y, a, l}]
   trail: [],        // exhaust plume points [{x, y, l, hot}], dropped in world space
   trailAcc: 0,
+  spray: [],        // wet-road mist [{x, y, l}], dropped in world space at the rear wheels
   rec: [],          // ghost recording: flat [x, y, angle, progress, ...]
   recAcc: 0,
   inputs: [],       // [step, input, step, input, …] — every step the steering changed
@@ -38,4 +39,5 @@ export function resetRace(startSample) {
   race.inputs = []; race.steps = 0; race.lastInput = 0;
   race.chainFlash = 0; race.shake = 0; race.breakT = 0; race.lostMult = 1; race.keptMult = 1;
   race.trail = []; race.trailAcc = 0;
+  race.spray = [];
 }
