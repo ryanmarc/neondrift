@@ -174,9 +174,13 @@ const deltaLine = (d, who) =>
   '<span class="' + (d < 0 ? "faster" : "slower") + '">' + (d < 0 ? "−" : "+") + Math.abs(d).toFixed(2) + '</span>'
   + '<span class="note"> ' + (d < 0 ? "on " : "off ") + who + "</span>";
 
-function showResult({ time, prevBest, isPB }) {
+function showResult({ time, prevBest, isPB, practice }) {
   let line;
-  if (ghost.rival) {
+  if (practice) {
+    // ?weather override: nothing was saved or posted, so the copy must not
+    // imply a PB or a saved ghost even though prevBest/isPB look like a fresh track.
+    line = '<span class="note">Practice — forced weather. Not saved, not posted.</span>';
+  } else if (ghost.rival) {
     // raced a leaderboard ghost: that comparison leads, your own best is the footnote
     line = deltaLine(time - ghost.rival.time, esc(ghost.rival.name) + '<span class="tag">#' + esc(ghost.rival.tag) + "</span> " + fmt(ghost.rival.time));
     if (prevBest != null) line += '<br><span class="note">' + (isPB ? "New personal best." : "Your best is " + fmt(prevBest) + ".") + "</span>";
@@ -186,7 +190,7 @@ function showResult({ time, prevBest, isPB }) {
   } else {
     line = deltaLine(time - prevBest, "your best of " + fmt(prevBest));
   }
-  $result.innerHTML = '<span class="big' + (isPB ? ' pb' : '') + '">' + fmt(time) + '</span>' + line;
+  $result.innerHTML = '<span class="big' + (isPB && !practice ? ' pb' : '') + '">' + fmt(time) + '</span>' + line;
   $go.textContent = "RACE AGAIN";
   syncClear();
   $overlay.classList.add("done");          // recap: hide the how-to

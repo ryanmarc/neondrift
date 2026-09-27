@@ -8,7 +8,7 @@
 //   off-track  (v)      – car crossed the edge; v = speed fraction 0..1
 //   countdown  (n)      – 3, 2, 1, then 0 for "GO"
 //   race-start
-//   race-finish ({ time, prevBest, isPB })
+//   race-finish ({ time, prevBest, isPB, ghost, inputs, practice }) – practice is true for a ?weather override: not saved, not posted
 //   track-loaded
 //   geometry-loaded ({ seed, id }) – any geometry load, daily or run stage (track/track.js); the music composes on it
 //   input-mode ("pointer" | "keys" | "pad")
