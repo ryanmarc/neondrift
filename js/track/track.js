@@ -6,6 +6,7 @@ import { emit } from "../core/events.js";
 import { buildTrack } from "./generator.js";
 import { buildDriftTrack } from "./layouts.js";
 import { styleFor } from "./styles.js";
+import { weatherFor } from "./weather.js";
 import { HALF_W } from "../config/tuning.js";
 
 /**
@@ -20,7 +21,15 @@ export const track = {
   length: 0,
   halfW: HALF_W,   // road half-width in px; a run's road mods scale it, loadTrackGeometry resets it
   style: "classic",  // the layout family (layouts.js), or "classic" for the harmonic generator
+  wet: false,      // a wet road (track/weather.js): integrate() applies WET, the renderer and audio follow
 };
+
+// ?weather=wet|dry, set once at boot by main.js. Never set in a worker, so the
+// leaderboard and the line search only ever see the seed's own weather.
+let forced = null;
+
+/** Force every later load wet or dry ("wet" | "dry"), or null for the seed's weather. */
+export function forceWeather(w) { forced = w === "wet" || w === "dry" ? w : null; }
 
 /**
  * Rebuild the track from a seed string. `shape` (optional) is the generator's
@@ -38,9 +47,10 @@ export function loadTrackGeometry(seed, shape) {
   track.length = built.length;
   track.halfW = HALF_W;
   track.id = hashTrack(built.S);
+  track.wet = (forced ?? weatherFor(seed)) === "wet";
   // Every geometry load — the daily track and each run stage — passes through
   // here, so this is the one announcement the music needs to follow the track.
-  emit("geometry-loaded", { seed, id: track.id });
+  emit("geometry-loaded", { seed, id: track.id, wet: track.wet });
 }
 
 // Identify the track by its actual shape, so a ghost is only ever replayed on the

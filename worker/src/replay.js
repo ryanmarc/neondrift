@@ -18,10 +18,10 @@ export function trackFor(seed) {
   let t = cache.get(seed);
   if (!t) {
     loadTrackGeometry(seed);
-    t = { id: track.id, samples: track.samples, length: track.length };
+    t = { id: track.id, samples: track.samples, length: track.length, wet: track.wet };
     cache.set(seed, t);
   }
-  track.seed = seed; track.id = t.id; track.samples = t.samples; track.length = t.length;
+  track.seed = seed; track.id = t.id; track.samples = t.samples; track.length = t.length; track.wet = t.wet;
   return t;
 }
 

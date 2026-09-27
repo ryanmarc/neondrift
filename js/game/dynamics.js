@@ -4,7 +4,7 @@
 // a Web Worker searching for the optimal line, and a Node harness.
 
 import { clamp, lerp } from "../core/math.js";
-import { T } from "../config/tuning.js";
+import { T, WET } from "../config/tuning.js";
 import { track, nearest } from "../track/track.js";
 
 /** Flag bits returned by integrate(). */
@@ -46,13 +46,18 @@ export function placeCar(car, s) {
  * (210, the speed a drift must have to count), `boostSteer` (false, boost
  * keeps firing while steering), `multSpeed` (0, top speed per ×1 of chain)
  * and `offFree` (0, excursions per stage that don't cut the chain).
+ * On a wet track (track.wet) grip, recovery, top speed and boost fill are
+ * scaled by WET; dry multiplies by 1, which is exact.
  */
 export function integrate(car, inp, dt, window = 45, P = T) {
   let flags = 0;
+  const wet = track.wet;
+  const kGrip = wet ? WET.grip : 1, kRec = wet ? WET.recover : 1;
+  const kSpeed = wet ? WET.speed : 1, kFill = wet ? WET.fill : 1;
   car.px = car.x; car.py = car.y; car.pa = car.a;   // previous state, for render interpolation
 
   if (inp !== 0) car.charge = Math.min(1, car.charge + dt / P.chargeUp);
-  else car.charge = Math.max(0, car.charge - dt / P.chargeDown);
+  else car.charge = Math.max(0, car.charge - dt / (P.chargeDown * kRec));
 
   const speed = Math.hypot(car.vx, car.vy);
   const turnScale = Math.min(1, speed / 175);
@@ -93,7 +98,7 @@ export function integrate(car, inp, dt, window = 45, P = T) {
   if (car.boosting) car.boost = Math.max(0, car.boost - P.boostDrain * dt);
 
   // Snowball: top speed climbs with the chain. Stock 0, so the daily race never sees it.
-  const top = (car.boosting ? P.boostSpeed : P.maxSpeed) * (1 + (P.multSpeed ?? 0) * (car.mult - 1)) * (car.off ? 0.52 : 1);
+  const top = (car.boosting ? P.boostSpeed : P.maxSpeed) * kSpeed * (1 + (P.multSpeed ?? 0) * (car.mult - 1)) * (car.off ? 0.52 : 1);
   const acc = car.boosting ? P.boostAccel : P.accel;
   fwd += acc * dt;
   if (fwd > top) fwd = lerp(fwd, top, 1 - Math.exp(-6 * dt));
@@ -103,8 +108,8 @@ export function integrate(car, inp, dt, window = 45, P = T) {
   // --- friction circle: grip can only correct so much sideways motion per second.
   // Holding the turn breaks traction (lower ceiling); releasing restores the ceiling
   // but the slide already in the car still has to bleed off, so it persists.
-  const latMax = lerp(P.gripMax, P.gripSlide, car.charge) * (car.off ? 0.45 : 1);
-  const corr = Math.min(Math.abs(lat) * P.stiffness, latMax) * dt;
+  const latMax = lerp(P.gripMax * kGrip, P.gripSlide * kGrip, car.charge) * (car.off ? 0.45 : 1);
+  const corr = Math.min(Math.abs(lat) * P.stiffness * kGrip, latMax) * dt;
   lat -= Math.sign(lat) * Math.min(Math.abs(lat), corr);
 
   car.vx = hx * fwd + -hy * lat; car.vy = hy * fwd + hx * lat;
@@ -147,7 +152,7 @@ export function integrate(car, inp, dt, window = 45, P = T) {
   const sliding = car.drift > P.driftMin && speed > (P.slideSpeed ?? 210) && !car.off;
   if (sliding) {
     flags |= SLIDING;
-    car.boost = Math.min(P.boostCap, car.boost + dt * car.drift * (speed / P.maxSpeed) * P.boostFill * car.mult);
+    car.boost = Math.min(P.boostCap, car.boost + dt * car.drift * (speed / P.maxSpeed) * P.boostFill * car.mult * kFill);
     car.mult = Math.min(P.multCap, car.mult + dt * P.multRise);
   } else if (!car.off) {
     car.mult = Math.max(1, car.mult - dt * P.multFall);

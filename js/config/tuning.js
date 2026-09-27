@@ -34,6 +34,17 @@ export const T = {
   zoomLag: 0.60,                // seconds for the zoom to follow a speed change
 };
 
+// ---------- wet road ----------
+// Multipliers applied on top of the physics table on a wet track (track.wet,
+// see track/weather.js). Starting values; Task 5 of the wet-tracks plan sets
+// them by measurement. Dry multiplies by exactly 1, so it is bit-identical.
+export const WET = {
+  grip: 0.72,      // gripMax, gripSlide and stiffness: less bite everywhere
+  recover: 1.35,   // chargeDown: traction comes back slower, so slides last
+  speed: 0.94,     // maxSpeed and boostSpeed: standing water costs top speed
+  fill: 1.15,      // boostFill: the longer slides pay a little more
+};
+
 // ---------- camera ----------
 // face: 0 = follow direction of travel only, 1 = follow the nose.
 // freq: how stiff the chase spring is (lower = looser, laggier). zeta: damping —

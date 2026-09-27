@@ -23,6 +23,7 @@ test("loadTrackGeometry emits geometry-loaded with the seed and the new id", () 
     assert.equal(g.id, g.idAtEmit, "track.id is already set when the event fires");
     assert.equal(g.seed, g.seedAtEmit, "track.seed is already set when the event fires");
     assert.ok(typeof g.id === "string" && g.id.length > 0);
+    assert.equal(typeof g.wet, "boolean", "the payload says whether the track is wet");
   }
   assert.notEqual(got[0].id, got[1].id);
 });
