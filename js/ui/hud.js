@@ -191,6 +191,7 @@ function showResult({ time, prevBest, isPB, practice }) {
   } else {
     line = deltaLine(time - prevBest, "your best of " + fmt(prevBest));
   }
+  if (!practice && track.wet) line += ' <span class="note">· wet</span>';
   $result.innerHTML = '<span class="big' + (isPB && !practice ? ' pb' : '') + '">' + fmt(time) + '</span>' + line;
   $go.textContent = "RACE AGAIN";
   syncClear();

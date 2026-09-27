@@ -61,7 +61,7 @@ function modList(picks) {
 }
 
 function showRunOver({ score, best, isBest, practice }) {
-  $roscore.textContent = "STAGE " + score.stages;
+  $roscore.textContent = "STAGE " + score.stages + (track.wet ? " · wet" : "");
   if (practice) {
     // ?weather override: nothing was saved, so the copy must not claim a best.
     $robest.textContent = "Practice — forced weather. Not saved.";
