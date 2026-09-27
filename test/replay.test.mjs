@@ -28,7 +28,7 @@ function recordRun(seed) {
   const input = createInput(sched);
   resetRace(track.samples[0]);
   let held = 0;
-  while (car.lap <= LAPS && race.steps < 120 * 75) {
+  while (car.lap <= LAPS && race.steps < 120 * 90) {
     const want = input(car.lap - 1 + car.prog);
     if (want !== held) {
       key("keyup", "ArrowLeft"); key("keyup", "ArrowRight");

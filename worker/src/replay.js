@@ -7,7 +7,7 @@ import { loadTrackGeometry, track } from "../../js/track/track.js";
 import { createCar, placeCar, integrate } from "../../js/game/dynamics.js";
 import { PHYSICS_DT, LAPS, GHOST_HZ } from "../../js/config/tuning.js";
 
-export const MAX_SECONDS = 75;        // replay cap, keeps a request inside the CPU budget
+export const MAX_SECONDS = 90;        // replay cap, keeps a request inside the CPU budget; matches validTime
 export const TIME_TOLERANCE = 0.05;   // seconds between replayed and claimed time
 export const PATH_TOLERANCE = 24;     // px between replayed and submitted ghost positions
 

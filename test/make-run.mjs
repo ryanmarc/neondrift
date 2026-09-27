@@ -20,7 +20,7 @@ loadTrackGeometry(seed);
 const input = createInput(bootstrap({ hold: 18, horizon: 120, edge: 6, speed: 120 }).schedule);
 resetRace(track.samples[0]);
 let held = 0; const key = (t, k) => (L[t] || []).forEach(f => f({ key: k }));
-while (car.lap <= LAPS && race.steps < 9000) {
+while (car.lap <= LAPS && race.steps < 120 * 90) {
   const w = input(car.lap - 1 + car.prog);
   if (w !== held) { key("keyup", "ArrowLeft"); key("keyup", "ArrowRight"); if (w === -1) key("keydown", "ArrowLeft"); if (w === 1) key("keydown", "ArrowRight"); held = w; }
   step(PHYSICS_DT);

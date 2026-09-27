@@ -20,7 +20,7 @@ export function validSecret(s) { return typeof s === "string" && /^[0-9a-f]{32}$
 export function validToken(s) { return typeof s === "string" && /^[0-9a-f]{32}$/.test(s); }
 export function validSeed(s) { return typeof s === "string" && s.length >= 1 && s.length <= 64 && /^[\x21-\x7e]+$/.test(s); }
 export function validTrackId(s) { return typeof s === "string" && /^[0-9a-z]{1,8}$/.test(s); }
-export function validTime(t) { return typeof t === "number" && Number.isFinite(t) && t > 0 && t <= 75; }
+export function validTime(t) { return typeof t === "number" && Number.isFinite(t) && t > 0 && t <= 90; }
 export function validCode(c) { return typeof c === "string" && c.length === 6 && [...c].every(ch => CODE_ALPHABET.includes(ch)); }
 
 export function validInputs(a) {
@@ -36,6 +36,6 @@ export function validInputs(a) {
 }
 
 export function validGhost(a) {
-  if (!Array.isArray(a) || a.length % 4 !== 0 || a.length > 9000) return false;
+  if (!Array.isArray(a) || a.length % 4 !== 0 || a.length > 10800) return false;   // 90s at 30Hz, 4 numbers a frame
   return a.every(x => typeof x === "number" && Number.isFinite(x));
 }

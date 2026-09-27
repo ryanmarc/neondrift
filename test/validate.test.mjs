@@ -42,13 +42,16 @@ test("ghosts are finite numbers in groups of four, bounded", () => {
   assert.equal(v.validGhost([1, 2, 0.5, 0.01]), true);
   assert.equal(v.validGhost([1, 2, 3]), false);
   assert.equal(v.validGhost([1, 2, Infinity, 0]), false);
-  assert.equal(v.validGhost(new Array(9004).fill(0)), false);
+  assert.equal(v.validGhost(new Array(9004).fill(0)), true);      // 75s: under the 90s cap
+  assert.equal(v.validGhost(new Array(10804).fill(0)), false);
 });
 
 test("times and codes", () => {
   assert.equal(v.validTime(41.2), true);
   assert.equal(v.validTime(0), false);
-  assert.equal(v.validTime(76), false);
+  assert.equal(v.validTime(76), true);        // the busier drift layouts raised the ceiling from 75s
+  assert.equal(v.validTime(90), true);
+  assert.equal(v.validTime(91), false);
   assert.equal(v.validCode("ABC234"), true);
   assert.equal(v.validCode("abc234"), false);
   assert.equal(v.validCode("ABC01O"), false);
