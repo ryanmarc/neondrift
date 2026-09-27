@@ -57,12 +57,18 @@ function measure(seed, wet) {
   return { m, off: r.off };
 }
 
-test("wet moves a handling metric by at least 15% (the mod-feel bar)", () => {
+// Which way each metric must move to count as "wet, not just different":
+// slower lap, lower top speed, longer slides, slower grip recovery. boostSec
+// has no prescribed direction (more slide time can fill it either way), so
+// it's measured but not part of the bar.
+const WET_DIR = { lapTime: 1, peakSpeed: -1, slideSec: 1, toGrip: 1 };
+
+test("wet moves a handling metric by at least 15% in the wet direction (the mod-feel bar)", () => {
   const seed = "2026-09-28";
   const dry = measure(seed, false).m, wet = measure(seed, true).m;
-  const rel = k => Math.abs(wet[k] / dry[k] - 1);
+  const signed = k => WET_DIR[k] * (wet[k] / dry[k] - 1);
   console.log(METRICS.map(k => k + " " + dry[k].toFixed(2) + " → " + wet[k].toFixed(2)).join(" | "));
-  assert.ok(Math.max(...METRICS.map(rel)) >= 0.15, "wet is too close to dry");
+  assert.ok(Math.max(...Object.keys(WET_DIR).map(signed)) >= 0.15, "wet isn't slicker in a wet-consistent way");
 });
 
 test("loadTrackGeometry sets track.wet from the seed, and forceWeather overrides it", () => {
@@ -131,4 +137,29 @@ test("the line cache keeps wet and dry lines apart", async () => {
   assert.notEqual(lineKey("abc", true), lineKey("abc", false));
   assert.ok(lineKey("abc", true).startsWith("neondrift:tabc:line:v"));
   assert.ok(lineKey("abc", true).endsWith("-w"));
+});
+
+const { RECIPES, buildDriftTrack } = await import(new URL("track/layouts.js", root));
+const { mulberry32, hashStr } = await import(new URL("core/random.js", root));
+const { HALF_W, WET } = await import(new URL("config/tuning.js", root));
+
+test("the car drives every family clean when wet, and a 3-lap race stays well under 90s", () => {
+  // The line search's starting controllers (as in layouts.test.mjs): one must get round clean.
+  const SETTINGS = [[4, 60, 12], [4, 120, 12], [6, 60, 12], [6, 120, 18], [4, 60, 18], [2, 0, 12]];
+  const rows = [];
+  for (const fam of Object.keys(RECIPES)) {
+    const t = buildDriftTrack(mulberry32(hashStr(fam + ":drive")), fam);
+    track.samples = t.S; track.length = t.length; track.halfW = HALF_W; track.wet = true;
+    let best = null;
+    for (const [edge, speed, hold] of SETTINGS) {
+      const r = bootstrap({ hold, horizon: 120, edge, speed }).result;   // full 3 laps
+      if (!best || r.off < best.off) best = r;
+      if (r.off === 0) break;
+    }
+    rows.push(fam + " " + best.time.toFixed(1) + "s off " + best.off.toFixed(2));
+    assert.equal(best.off, 0, fam + " leaves the road wet for " + best.off.toFixed(2) + "s");
+    assert.ok(best.finished && best.time < 70, fam + " wet race " + best.time.toFixed(1) + "s: too close to the 90s cap");
+  }
+  track.wet = false;
+  console.log("wet 3-lap bootstrap: " + rows.join(" | ") + "  WET " + JSON.stringify(WET));
 });
