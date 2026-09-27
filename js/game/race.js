@@ -5,6 +5,7 @@
 import { clamp } from "../core/math.js";
 import { emit } from "../core/events.js";
 import { LAPS, PHYSICS_DT, T_TICK, T_GO, T } from "../config/tuning.js";
+import { WEATHER_PARAM } from "../config/params.js";
 import { track, loadTrackGeometry } from "../track/track.js";
 import { rebuildGuides } from "../track/guides.js";
 import { car, race, resetRace } from "./state.js";
@@ -46,7 +47,7 @@ export function start() {
 
 function finish() {
   race.running = false; race.finished = true;
-  emit("race-finish", commitRun(race.time, race.rec, race.inputs));
+  emit("race-finish", commitRun(race.time, race.rec, race.inputs, WEATHER_PARAM == null));
 }
 
 /**

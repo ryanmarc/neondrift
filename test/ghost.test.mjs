@@ -45,3 +45,13 @@ test("loading a new track clears the rival", () => {
   assert.equal(g.ghost.rival, null);
   assert.equal(g.ghostAt(0), null);
 });
+
+test("a practice run saves nothing and says so", () => {
+  const best = g.ghost.bestTime, data = g.ghost.data;
+  const r = g.commitRun(0.001, [9, 9, 9, 9], [0, -1], false);   // faster than any real best
+  assert.equal(r.practice, true);
+  assert.equal(r.isPB, false, "never a PB: nothing was saved");
+  assert.equal(g.ghost.bestTime, best, "best unchanged");
+  assert.equal(g.ghost.data, data, "ghost unchanged");
+  assert.equal(g.commitRun(999, [], []).practice, false, "a normal commit is not practice");
+});

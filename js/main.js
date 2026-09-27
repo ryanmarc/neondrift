@@ -1,12 +1,12 @@
 // Entry point. Modules with side effects (event subscriptions, DOM wiring) are
 // imported for those effects; the rest is explicit.
 
-import { INITIAL_SEED } from "./config/params.js";
+import { INITIAL_SEED, WEATHER_PARAM } from "./config/params.js";
 import { loadTrack, start, tick, run } from "./game/race.js";
 import { resize } from "./render/renderer.js";
 import { armAutoplay } from "./audio/context.js";
 import { car, race } from "./game/state.js";
-import { track } from "./track/track.js";
+import { track, forceWeather } from "./track/track.js";
 import { ghost } from "./game/ghost.js";
 import { guides } from "./track/guides.js";
 import { camera } from "./render/camera.js";
@@ -21,6 +21,7 @@ import "./net/leaderboard.js";  // subscribes to track-loaded and race-finish
 import "./ui/board.js";         // the leaderboard panel
 import "./ui/runui.js";        // the run's screens
 
+forceWeather(WEATHER_PARAM);
 loadTrack(INITIAL_SEED);
 resize();
 armAutoplay();   // title-screen music as soon as the browser allows it

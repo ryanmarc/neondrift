@@ -26,3 +26,10 @@ test("without a loaded board, the local personal-best rule applies", () => {
   board.status = "loading";
   assert.equal(worthPosting({ time: 30.0, isPB: true }), true);
 });
+
+test("a practice run (?weather override) is never posted", () => {
+  board.status = "ready"; board.me = null;
+  assert.equal(worthPosting({ time: 30.0, isPB: true, practice: true }), false);
+  board.status = "unavailable";
+  assert.equal(worthPosting({ time: 30.0, isPB: true, practice: true }), false);
+});

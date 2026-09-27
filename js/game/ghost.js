@@ -49,11 +49,12 @@ export function clearGhost() {
 /**
  * Called at the finish line. Saves the run if it's a personal best and returns
  * what the end screen and the leaderboard need. prevBest is captured before it
- * is overwritten.
+ * is overwritten. persist false (a ?weather override) is practice: nothing is
+ * saved, and the leaderboard won't post it.
  */
-export function commitRun(time, rec, inputs) {
+export function commitRun(time, rec, inputs, persist = true) {
   const prevBest = ghost.bestTime;
-  const isPB = prevBest == null || time < prevBest;
+  const isPB = persist && (prevBest == null || time < prevBest);
   if (isPB) {
     ghost.bestTime = time;
     ghost.data = rec;
@@ -62,7 +63,7 @@ export function commitRun(time, rec, inputs) {
     storage.write(keyGhost, JSON.stringify(rec));
     storage.write(keyInputs, JSON.stringify(inputs));
   }
-  return { time, prevBest, isPB, ghost: rec, inputs };
+  return { time, prevBest, isPB, ghost: rec, inputs, practice: !persist };
 }
 
 /** Ghost pose at race time t, interpolated between recorded frames. */

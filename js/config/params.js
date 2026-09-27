@@ -68,6 +68,12 @@ export const INITIAL_SEED = !SEED_OVERRIDE
 // linked seed. Read once by net/leaderboard.js, which then strips it.
 export const RIVAL_PARAM = QS.get("rival");
 
+// ?weather=wet|dry — force the weather for testing (see track/weather.js). A
+// forced run is practice: not saved as a best, not posted, because the worker
+// replays on the seed's own weather.
+const WX = QS.get("weather");
+export const WEATHER_PARAM = WX === "wet" || WX === "dry" ? WX : null;
+
 // FEATURE FLAG: drift guide markers. Off by default. Flip to true here to bring
 // them back (which also restores the on-screen toggle button), or append ?guides
 // to the page URL to enable them without editing this file.

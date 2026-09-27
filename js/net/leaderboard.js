@@ -184,6 +184,7 @@ on("track-loaded", async () => {
  * board hasn't loaded, fall back to the local personal-best rule.
  */
 export function worthPosting(result) {
+  if (result.practice) return false;   // ?weather override: the worker would replay it on the seed's own weather
   if (board.status !== "ready") return result.isPB;
   return board.me == null || result.time < board.me.time;
 }
