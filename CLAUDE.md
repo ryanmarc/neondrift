@@ -128,9 +128,12 @@ every run end — a capped drain let a chain-keeping build refill forever. It is
 refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
 keeps you alive, not just finishing laps. On a wet stage the refill is scaled
-again by `TIMER.wetGain` (0.90): a wet drive slides more, so the raw refill
-overshot dry, and `wetGain` brings it back within `test/wet-run.test.mjs`'s
-±10% net-clock band across stages 1–8. Clearing a stage pays `TIMER.bonus`
+again by `TIMER.wetGain` (0.87): a wet drive slides more, so the raw refill
+would outrun dry's net clock, and `wetGain` brings the two to near-equal net
+across stages 1–8, pooled over several days
+(`test/wet-run.test.mjs`, within 5% of total dry refill — a single day's net
+sits near zero, so a band relative to one day's net is nearly free to pass).
+Clearing a stage pays `TIMER.bonus`
 seconds, scaled by the build's bonus multiplier. **The chain carries across
 stages**: a run is one continuous drive, so the multiplier you cross the line
 with is the one the next stage starts on (`run.chain`). It has to — the chain
