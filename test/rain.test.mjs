@@ -21,3 +21,14 @@ test("stepping recycles drops inside the viewport and never reallocates", () => 
     assert.ok(x >= -100 && x <= 900 && y >= -100 && y <= 700, "drop " + i + " at " + x + "," + y);
   }
 });
+
+const { wetSkid } = await import(new URL("../js/audio/rain.js", import.meta.url));
+
+test("a wet skid hisses more and rings less; dry is today's squeal", () => {
+  const dry = wetSkid(1, false), wet = wetSkid(1, true);
+  assert.deepEqual(dry, { q: 12, squeal: 0.377, hiss: 0 }, "dry keeps the tuned squeal");
+  assert.ok(wet.q < dry.q, "lower Q: less ring");
+  assert.ok(wet.squeal < dry.squeal);
+  assert.ok(wet.hiss > 0);
+  assert.deepEqual(wetSkid(0, true), { q: wet.q, squeal: 0, hiss: 0 }, "silent with no slide");
+});

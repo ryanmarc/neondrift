@@ -11,13 +11,14 @@ import { on } from "../core/events.js";
 import * as storage from "../core/storage.js";
 import { whenReady } from "./context.js";
 import { createEngine } from "./engine.js";
+import { createRainBed, wetSkid } from "./rain.js";
 
 const MUTE_KEY = "neondrift:mute";
 
 let ctx = null, master = null, noiseBuf = null, noiseSrc = null;
 let squealF = null, squealG = null, harmF = null, harmG = null, scrubF = null, scrubG = null;
 let offF = null, offG = null, airF = null, airG = null, lfo = null, lfoG = null;
-let engine = null;
+let engine = null, rain = null, wet = false;
 let ready = false;
 let muted = storage.read(MUTE_KEY) === "1";
 
@@ -69,6 +70,8 @@ whenReady((c, m) => {
 
   // the engine: its own module, on this bus so the effects switch covers it
   engine = createEngine(ctx, master);
+
+  rain = createRainBed(ctx, master, noiseBuf); rain.setWet(wet);
 
   noiseSrc.start();
   ready = true;
@@ -161,6 +164,10 @@ on("stage-clear", stageClear);
 on("timer-low", timerLow);
 on("run-over", runOver);
 
+// The rain bed follows the loaded track, on the title screen too. Before the
+// context exists the flag waits and whenReady applies it.
+on("geometry-loaded", ({ wet: w }) => { wet = !!w; if (rain) rain.setWet(wet); });
+
 // ---------- public API ----------
 
 // Context lifecycle (unlock, suspend) lives in context.js; re-exported so call
@@ -182,7 +189,10 @@ export function update(drift, speed, off, boosting) {
   if (!ready) return;
   const t = ctx.currentTime;
   const slide = clamp((drift - 0.12) / 0.75, 0, 1) * clamp(speed / 420, 0, 1);
-  squealG.gain.setTargetAtTime(slide * 0.377, t, 0.05);
+  const sk = wetSkid(slide, wet);
+  squealG.gain.setTargetAtTime(sk.squeal, t, 0.05);
+  squealF.Q.setTargetAtTime(sk.q, t, 0.2);
+  rain.hiss(sk.hiss);
   harmG.gain.setTargetAtTime(slide * 0.064, t, 0.05);
   scrubG.gain.setTargetAtTime(slide * 0.059, t, 0.05);
   squealF.frequency.setTargetAtTime(780 + drift * 620, t, 0.09);
