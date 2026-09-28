@@ -12,7 +12,9 @@ import { guides } from "../track/guides.js";
 import { car, race, resetRace } from "../game/state.js";
 import { ghost, unloadGhost } from "../game/ghost.js";
 import { loadTrack, start, setRules } from "../game/race.js";
-import { setPeer, removePeer, clearPeers, clearPoses, addPose } from "../game/peers.js";
+import { isDaily } from "../game/daily.js";
+import { peers, setPeer, removePeer, clearPeers, clearPoses, addPose } from "../game/peers.js";
+import { WEATHER_PARAM, todayUtc } from "../config/params.js";
 import { camera, resetCamera } from "../render/camera.js";
 import { ensureSecret, getName } from "../net/identity.js";
 import { live, serverNow } from "./state.js";
@@ -22,7 +24,7 @@ import { createAttempts, recordSent, queueOffline, takeQueued, onResult, resetAt
 
 const POSE_DT = 0.1;          // seconds between poses sent: 10Hz
 
-let sock = null, timer = 0, poseAcc = 0, savedGuides = false;
+let sock = null, timer = 0, poseAcc = 0, savedGuides = false, wasDaily = false;
 const attempts = createAttempts();   // laps sent and awaiting a verdict, and the fastest one queued while offline
 
 const liveRules = {
@@ -31,7 +33,8 @@ const liveRules = {
     poseAcc += dt;
     if (poseAcc >= POSE_DT) {
       poseAcc -= POSE_DT;
-      sock?.send({ t: "pose", p: [+car.x.toFixed(1), +car.y.toFixed(1), +car.a.toFixed(3), +car.prog.toFixed(4)] });
+      // Nobody else here: nobody to draw it for, and every relayed message is billed.
+      if (peers.size > 0) sock?.send({ t: "pose", p: [+car.x.toFixed(1), +car.y.toFixed(1), +car.a.toFixed(3), +car.prog.toFixed(4)] });
     }
     return !open(live.round, serverNow());   // the grace is over: stop the car
   },
@@ -117,14 +120,15 @@ function onMessage(m) {
       break;
     }
     case "results":
-      if (m.round === live.round) { live.results = m; live.standings = m.rows; emit("live-results", m); }
+      // Only while this round's results phase is showing: a late one must not cover a lap.
+      if (m.round === live.round && !phaseAt(serverNow()).racing) { live.results = m; live.standings = m.rows; emit("live-results", m); }
       break;
   }
 }
 
 function onStatus(s) {
   live.status = s;
-  if (s === "unavailable" || s === "displaced") {
+  if (s === "unavailable" || s === "displaced" || s === "idle") {
     const why = s;
     leaveLive();
     live.status = why;           // leaveLive resets it; the title screen says why
@@ -135,9 +139,13 @@ function onStatus(s) {
 /** Join the live room from the title screen. Call inside a tap handler (audio unlock is the caller's). */
 export function enterLive() {
   if (live.active) return;
+  // A forced weather rolls a different car than the seed's, so every lap
+  // would fail the room's replay: refuse up front, like the practice it is.
+  if (WEATHER_PARAM) { live.status = "practice"; emit("live-state"); return; }
   live.active = true; live.status = "joining"; live.round = -1;
   live.standings = []; live.results = null; live.best = null; live.offset = 0;
   live.savedSeed = track.seed;
+  wasDaily = isDaily();   // on leave, the daily comes back as today's, even after midnight UTC
   savedGuides = guides.visible; guides.visible = false;
   setRules(liveRules);
   emit("live-state");
@@ -146,10 +154,10 @@ export function enterLive() {
   timer = setInterval(sync, 250);
 }
 
-/** Leave the room and go back to the daily race on the track that was loaded before. */
+/** Leave the room and go back to the daily race: today's if the daily was loaded, else the track that was. */
 export function leaveLive() {
   if (!live.active) return;
-  live.active = false; live.status = "idle";
+  live.active = false; live.status = "off";
   clearInterval(timer);
   sock?.close(); sock = null;
   resetAttempts(attempts);
@@ -157,7 +165,7 @@ export function leaveLive() {
   setRules(null);
   race.running = false; race.finished = false; race.countdown = 0; race.goTimer = 0;
   guides.visible = savedGuides;
-  loadTrack(live.savedSeed);
+  loadTrack(wasDaily ? todayUtc() : live.savedSeed);
   emit("live-leave");
 }
 

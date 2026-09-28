@@ -19,6 +19,8 @@ const STATUS = {
   joining: "Joining…",
   unavailable: "Live is unavailable right now.",
   displaced: "Live is open in another tab.",
+  idle: "You were idle, so you left the room.",
+  practice: "Live is off while ?weather is set.",
 };
 
 let myId = null;

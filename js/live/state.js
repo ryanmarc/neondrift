@@ -3,7 +3,7 @@
 
 export const live = {
   active: false,
-  status: "idle",     // idle | joining | on | offline | unavailable | displaced
+  status: "off",      // off | joining | on | offline | unavailable | displaced | idle | practice
   round: -1,          // the round whose map is loaded, -1 before the first
   offset: 0,          // server clock minus Date.now(), from each welcome
   standings: [],      // [{ id, name, tag, time }] for this round, fastest first
