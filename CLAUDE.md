@@ -277,12 +277,50 @@ time. Bests are local only, per day and all-time, in `localStorage`; there is
 no board, no ghost and no optimal line for a stage. The run has three sounds
 of its own — stage clear, low clock, run over — on its events in `audio/sfx.js`.
 
+### Live mode
+
+A public room, one map for everyone at once, best single lap ranks. The
+schedule is the wall clock itself: rounds are fixed 195s slots (`SLOT_MS` in
+`js/live/clock.js`) — up to 180s racing (`RACING_MS`, plus a `GRACE_MS` of
+2s for a lap already on track at the buzzer), then results — counted from a
+fixed epoch (`LIVE_EPOCH`, 2026-09-27). Every client and the worker resolve
+the current round and its seed (`live-<round>`) independently from
+`Date.now()`; a room only ever tells a client the offset between its clock
+and the room's, never the round itself. Changing `SLOT_MS`, `RACING_MS` or
+`LIVE_EPOCH` reseeds every round at once — see the `CUTOVER`-style rule
+below.
+
+An attempt is one lap (`laps: 1`) from a standing start with a 1-tick
+countdown (`T_TICK`, so 1.8s — the daily race's is 3 ticks), submitted on
+finish and verified by the same replay path as the daily race with `laps: 1`
+passed through. Other players' positions (`pose` messages, 10Hz) are purely
+cosmetic: drawn as ghosts (`js/game/peers.js`) a fixed delay behind the
+present so network jitter doesn't show. They are never replayed and never
+affect an attempt's verdict.
+
+Rooms hold 16 players (`ROOM_CAP`). There is no lobby object: `GET
+/live/join` asks room-1, room-2, … in order for their open-socket count (not
+player count — an unhelloed socket still holds a seat, or a saturated room
+would keep getting sent traffic) and returns the first with space, up to 50
+rooms; the client then opens a WebSocket straight to that named room.
+
+The socket closes 4000 when a newer socket from the same player takes its
+seat — a second tab displaces the first, which does not reconnect — and 4001
+when the room filled before the hello landed, an ordinary drop that retries
+through the normal backoff rather than failing outright. A join that never
+connects at all, or a 1008 (a protocol/abuse verdict from the room), is
+final: the title screen shows why and stops retrying.
+
+Your own ghost for a live attempt lives in memory only — `ghost.data` is set
+from the verified recording on an improved result, never written to
+`localStorage` — so it is gone on reload or on leaving the room.
+
 ## Architecture
 
 ### Module layout
 
 ES modules, loaded from `<script type="module" src="js/main.js">`. Dependencies
-point one way — `ui` → `run` → `game` → `track`/`render`/`audio` → `config`/`core` —
+point one way — `ui` → `run`/`live` → `game` → `track`/`render`/`audio` → `config`/`core` —
 and the game layer never imports the DOM or audio code: it emits events on a
 tiny bus (`core/events.js`) and `ui/hud.js` and `audio/sfx.js` subscribe.
 That is what keeps the graph acyclic; keep it that way when adding features.
@@ -308,6 +346,7 @@ js/game/    state.js    `car`, `race`, resetRace
             ghost.js    `ghost` {data, bestTime}, loadGhost, commitRun, clearGhost, ghostAt…
             physics.js  step(dt) — integrate() on the live car + marks, plume, recording, events
             race.js     loadTrack, start, tick(now), run — the per-frame orchestration
+            peers.js    other live players as ghosts: pose buffers keyed by id, peerPose(p, now) interpolates a fixed delay behind now — pure, the renderer draws it
 js/sim/     schedule.js input schedules keyed on track progress; createInput, normalize, mutate
             simulate.js simulate(schedule) and the predictive bootstrap() controller
             search.js   optimize() (annealing) and polish() (coordinate descent)
@@ -320,6 +359,11 @@ js/run/     mods.js     the mod catalogue; buildFrom(picks) folds picks into a b
             stages.js   stageSeed, stageShape (the track ramp), beats (score order), parseBest, storage keys
             state.js    the mutable `run` object (leaf, so the HUD can read it)
             run.js      startRun, pick, restart, abandon; the run's rules object; loadStage
+js/live/    clock.js    LIVE_EPOCH, SLOT_MS, RACING_MS, GRACE_MS; roundAt/roundStart/seedFor/phaseAt/open/entryAction — pure, shared with the worker
+            socket.js   connect(): /live/join then a WebSocket to the named room, status + backoff, close-code handling
+            attempts.js pure: laps sent and awaiting a verdict, the single fastest lap queued while offline, pairing a room verdict to its lap
+            state.js    the mutable `live` object (leaf, like `run`'s) and serverNow()
+            live.js     enterLive, leaveLive, restartAttempt; the live rules object; talks to the room only through socket.js
 js/input/   input.js    steer() from pointer halves + arrow keys + gamepad; emits input-mode
             gamepad.js  pure: padState(gp) → digital x/y + A/B/LB/RB, risingEdges, firstPad, stepIndex
 js/render/  camera.js   `camera`, resetCamera, updateCamera
@@ -339,6 +383,8 @@ js/ui/      hud.js      per-frame readouts + end screen; subscribes to game even
             controls.js buttons and the R key
             runhud.js   per-frame run readouts (stage, clock, time bar)
             runui.js    the run button's best line, the offer screen, the run-over screen
+            livehud.js  per-frame live readouts: round clock, rank, top five
+            liveui.js   live's title status line, the leave buttons, the between-rounds results overlay
 ```
 
 Conventions:
@@ -401,6 +447,10 @@ Conventions:
   `WEATHER_CUTOVER` (`track/weather.js`) is the same rule for weather: past
   days never turn wet, and the worker must be on `main` before it too, or a
   wet day's posts fail replay.
+- **The live seed rule is `CUTOVER`'s rule:** `styles.js`/`weather.js`'s
+  `live-` branch and `clock.js` must be on `main` before a client that uses
+  them; changing `SLOT_MS`/`RACING_MS`/`LIVE_EPOCH` changes every round's map
+  at once, so only change them together with the worker.
 - **Camera smoothing must be framerate-independent.** Use
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
@@ -478,6 +528,9 @@ Conventions:
   only applies to a mod id; a fully-capped catalogue (every mod held to its
   max) still leaves Skip standing, so a run can never strand a player with no
   legal move.
+- **The Room Durable Object is a shell over `worker/src/room-core.js`,** a
+  plain class with no `cloudflare:workers` import, so `node --test` can
+  import the worker.
 
 ## Tuning constants
 
@@ -738,10 +791,27 @@ A Cloudflare Worker with D1. It imports the game's `dynamics.js`, `track.js`
 and `tuning.js` by relative path and verifies every submitted run by replaying
 its recorded inputs; the replayed time is what gets stored. Routes are in
 `worker/src/index.js`: `POST /runs`, `GET /board`, `POST /name`,
-`POST /pair/start`, `POST /pair/approve`, `POST /pair/poll`, and `GET /ghost`
-(a stored run's recording, for racing a leaderboard ghost). CORS is limited to `ALLOWED_ORIGINS`
+`POST /pair/start`, `POST /pair/approve`, `POST /pair/poll`, `GET /ghost`
+(a stored run's recording, for racing a leaderboard ghost), `GET /live/join`
+(the first room with space) and `GET /live/room/<name>` (the WebSocket
+upgrade into that room). CORS is limited to `ALLOWED_ORIGINS`
 in `wrangler.toml`: the GitHub Pages origin in production, localhost only
 under `wrangler dev --env dev`. Writes are rate limited per IP.
+
+**Live mode's rooms are a Durable Object** (`worker/src/live.js`'s `Room`,
+one instance per room name, SQLite-backed on the free plan —
+`new_sqlite_classes` in `wrangler.toml`). `wrangler dev` runs Durable
+Objects locally too, so `npm run dev` in `worker/` is enough to test live
+mode end to end without deploying. Checked 2026-09-27 against
+https://developers.cloudflare.com/durable-objects/platform/pricing/: the
+Workers Free plan gives Durable Objects 100,000 requests/day and
+13,000 GB-s/day of duration; incoming WebSocket messages are billed at a
+20:1 ratio (20 messages = 1 request), outgoing messages and pings are free.
+At 10Hz poses that's 10 incoming messages/s per driving player → 0.5 billed
+requests/s → 1,800 requests/hour, so the request quota alone caps the free
+plan at roughly 100,000 ÷ 1,800 ≈ 55 player-hours/day of driving before
+joins, attempts and results are even counted — the GB-s duration cap is the
+other limit but depends on per-message CPU time, which wasn't measured here.
 
 **Pairing never hands a secret to whoever types a code.** It is the device-
 authorization shape (RFC 8628): the *new* device calls `/pair/start`, shows
@@ -776,7 +846,12 @@ deploy script on purpose. Schema changes are the exception: apply them with
 
 Tests: `node --test "test/*.test.mjs"` covers the input recording, the replay (a genuine
 run replays to the identical time; tampering, wrong claims and unfinished runs
-are rejected), validation, and the client identity.
+are rejected), validation, the client identity, and live mode end to end —
+the round clock, the room reducer (`room-core.js`), the Room Durable Object
+shell (a fake `ctx`), the `/live/*` routes, the peer-ghost interpolation and
+the client's attempt/pose bookkeeping (`test/live-*.test.mjs`).
+`test/live-smoke.mjs` is a manual script against a running `npm run dev`, not
+part of the automated suite.
 
 ## Not built yet
 
@@ -801,3 +876,15 @@ are rejected), validation, and the client identity.
 - **Puddles, a drying line, wet-specific mods.** Weather is currently one
   wet/dry roll per track; standing water in fixed spots, a line that dries
   over a race, or a run mod that plays with weather are all unbuilt.
+- **Bot ghosts for thin live rooms.** A room with one or two players has no
+  one to race; replaying a recorded best would give it a pulse.
+- **Points across live rounds.** Standings reset every round; nothing
+  accumulates a session or daily score.
+- **Persisted live results.** Unlike a daily run, a live attempt is never
+  written to D1 — a round's standings live only in the Durable Object's own
+  storage (kept just so hibernation doesn't lose them mid-round), so there is
+  no history of past rounds or players' live results to browse.
+- **Private live rooms.** `Room`'s name already allows one per code or
+  party; only the public `room-<n>` pool is wired up.
+- **Live chat and spectating.** No text channel and no way to watch a room
+  without a car in it.
