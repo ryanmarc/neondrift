@@ -11,7 +11,7 @@ import { track } from "../track/track.js";
 import { isDateSeed, todayUtc } from "../config/params.js";
 import { run } from "../run/state.js";
 import { startRun } from "../run/run.js";
-import { padState, risingEdges, firstPad, stepIndex } from "../input/gamepad.js";
+import { padState, risingEdges, firstPad, stepIndex, homeIndex } from "../input/gamepad.js";
 import { emit } from "../core/events.js";
 import { live } from "../live/state.js";
 import { enterLive, restartAttempt } from "../live/live.js";
@@ -91,8 +91,11 @@ function pollPad() {
   const step = (e.right || e.down) ? 1 : (e.left || e.up) ? -1 : 0;
   if ((step || e.a) && !padUsed) { padUsed = true; emit("input-mode", "pad"); }   // the title hint switches to pad wording
   const list = padTargets();
-  // a screen change drops the focused button out of the list: restart at the first one
-  let i = Math.max(0, list.indexOf(padEl));
+  // a screen change drops the focused button out of the list: restart at the
+  // screen's home button (data-pad-home: the race button, not the garage row
+  // above it, so A still races again from the recap), else the first one
+  let i = list.indexOf(padEl);
+  if (i < 0) i = homeIndex(list.map(el => el.hasAttribute("data-pad-home")));
   if (step) i = stepIndex(i, list.length, step);
   const next = list[i] || null;
   if (padEl && padEl !== next) padEl.classList.remove("padfocus");   // even if it's now hidden

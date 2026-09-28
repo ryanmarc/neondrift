@@ -47,6 +47,12 @@ export function firstPad(pads) {
 
 /** Move a focus index by delta through n items, wrapping; a stale index
  * (past the end, after the list shrank) restarts from the first item. */
+/** Where a fresh focus ring starts: the first button flagged home, else the first. */
+export function homeIndex(isHome) {
+  const i = isHome.indexOf(true);
+  return i < 0 ? 0 : i;
+}
+
 export function stepIndex(i, n, delta) {
   if (n <= 0) return 0;
   if (i < 0 || i >= n) return 0;

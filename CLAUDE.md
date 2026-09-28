@@ -740,7 +740,9 @@ marked `data-pad`: the title buttons and the garage row, race again, the
 mod cards and Skip, the run-over pair, the garage's cards and Done — with
 the stick or d-pad in any direction; A presses the focused one, B is the R
 key, LB/RB are the day arrows. While the garage is open, B closes it and
-LB/RB do nothing, so the day can't change behind the panel. Every
+LB/RB do nothing, so the day can't change behind the panel. A screen
+that comes back starts the ring on its home button (`data-pad-home`, the
+race button), not the garage row above it, so A still races again. Every
 action goes through the button's own click handler, so the audio unlock,
 the line-computing guard and the run's Skip rule apply unchanged. The ring
 is drawn only once the pad has been used, so mouse and touch players never

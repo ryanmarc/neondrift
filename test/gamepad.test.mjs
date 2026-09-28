@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const root = new URL("../js/", import.meta.url);
-const { padState, risingEdges, firstPad, stepIndex, DEADZONE, BTN } = await import(new URL("input/gamepad.js", root));
+const { padState, risingEdges, firstPad, stepIndex, homeIndex, DEADZONE, BTN } = await import(new URL("input/gamepad.js", root));
 
 // A Gamepad-shaped object: 16 standard-mapping buttons, 4 axes.
 function pad({ axes = [0, 0, 0, 0], pressed = [] } = {}) {
@@ -70,3 +70,11 @@ test("stepIndex wraps around the list and is idle on an empty one", () => {
   assert.equal(stepIndex(7, 4, 1), 0);    // stale index past the end resets
   assert.equal(stepIndex(0, 0, 1), 0);
 });
+
+test("homeIndex: a fresh ring starts on the screen's home button, else the first", () => {
+  // the title screen: the garage row comes before the race button, which is home
+  assert.equal(homeIndex([false, true, false]), 1);
+  assert.equal(homeIndex([false, false]), 0);     // no home on this screen: the first button
+  assert.equal(homeIndex([]), 0);
+});
+
