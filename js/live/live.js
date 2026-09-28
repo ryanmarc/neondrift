@@ -18,13 +18,12 @@ import { ensureSecret, getName } from "../net/identity.js";
 import { live, serverNow } from "./state.js";
 import { roundAt, phaseAt, seedFor, open, entryAction } from "./clock.js";
 import { connect } from "./socket.js";
+import { createAttempts, recordSent, queueOffline, takeQueued, onResult, resetAttempts, clearPending } from "./attempts.js";
 
 const POSE_DT = 0.1;          // seconds between poses sent: 10Hz
-const MATCH = 0.05;           // seconds: a result belongs to the pending lap within this (the worker's TIME_TOLERANCE)
 
 let sock = null, timer = 0, poseAcc = 0, savedGuides = false;
-let pending = [];             // laps sent and awaiting a verdict: [{ time, rec }]
-let queued = null;            // the fastest lap finished while disconnected: { round, inputs, time, rec }
+const attempts = createAttempts();   // laps sent and awaiting a verdict, and the fastest one queued while offline
 
 const liveRules = {
   laps: 1,
@@ -46,9 +45,9 @@ const liveRules = {
 function submit(a) {
   if (!open(a.round, serverNow())) return;
   if (sock && sock.send({ t: "attempt", round: a.round, inputs: a.inputs, time: a.time })) {
-    pending.push({ time: a.time, rec: a.rec });
-  } else if (!queued || a.time < queued.time) {
-    queued = a;              // offline: keep the fastest, the room takes one every 5s anyway
+    recordSent(attempts, { time: a.time, rec: a.rec });
+  } else {
+    queueOffline(attempts, a);   // offline: keep the fastest, the room takes one every 5s anyway
   }
 }
 
@@ -60,7 +59,7 @@ function attempt() {
 
 function enterRound(r) {
   live.round = r; live.best = null; live.standings = []; live.results = null;
-  pending = []; queued = null;
+  resetAttempts(attempts);
   loadTrackGeometry(seedFor(r));
   unloadGhost();
   clearPoses();
@@ -90,9 +89,11 @@ function onMessage(m) {
       live.status = "on";
       clearPeers();
       for (const p of m.peers) setPeer(p);
+      clearPending(attempts);                        // verdicts for laps sent on the old socket are lost
       sync();                                        // may load the round's map
       live.standings = m.standings;
-      if (queued && open(queued.round, serverNow())) { const q = queued; queued = null; submit(q); }
+      const q = takeQueued(attempts, serverNow());
+      if (q) submit(q);
       emit("live-state");
       break;
     }
@@ -107,13 +108,11 @@ function onMessage(m) {
       break;
     }
     case "attempt-result": {
-      const i = m.ok ? pending.findIndex(p => Math.abs(p.time - m.time) < MATCH) : -1;
+      const rec = onResult(attempts, m);
       if (m.ok && m.improved) {
         live.best = m.time;
-        if (i >= 0) { ghost.data = pending[i].rec; ghost.bestTime = m.time; }
+        if (rec) { ghost.data = rec; ghost.bestTime = m.time; }
       }
-      if (i >= 0) pending.splice(i, 1);
-      else if (!m.ok) pending.shift();
       emit("live-attempt", m);
       break;
     }
@@ -153,10 +152,10 @@ export function leaveLive() {
   live.active = false; live.status = "idle";
   clearInterval(timer);
   sock?.close(); sock = null;
-  pending = []; queued = null;
+  resetAttempts(attempts);
   clearPeers();
   setRules(null);
-  race.running = false; race.finished = false;
+  race.running = false; race.finished = false; race.countdown = 0; race.goTimer = 0;
   guides.visible = savedGuides;
   loadTrack(live.savedSeed);
   emit("live-leave");
