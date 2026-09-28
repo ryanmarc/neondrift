@@ -40,7 +40,9 @@ below works with it unchanged.
   practice: not saved as a best, not posted (the worker replays on the seed's
   own weather). Practice either way, even when the value matches what the
   seed would have rolled anyway — the override is a testing tool, and telling
-  that case apart from a real one wasn't worth the code.
+  that case apart from a real one wasn't worth the code. Live mode refuses to
+  start while it is set ("Live is off while ?weather is set."): every lap
+  would fail the room's replay.
 
 ## Constraints — keep these
 
@@ -296,20 +298,43 @@ finish and verified by the same replay path as the daily race with `laps: 1`
 passed through. Other players' positions (`pose` messages, 10Hz) are purely
 cosmetic: drawn as ghosts (`js/game/peers.js`) a fixed delay behind the
 present so network jitter doesn't show. They are never replayed and never
-affect an attempt's verdict.
+affect an attempt's verdict. A client sends poses only while someone else is
+in the room — alone, nobody would draw them and every incoming message is
+billed.
 
 Rooms hold 16 players (`ROOM_CAP`). There is no lobby object: `GET
-/live/join` asks room-1, room-2, … in order for their open-socket count (not
-player count — an unhelloed socket still holds a seat, or a saturated room
-would keep getting sent traffic) and returns the first with space, up to 50
-rooms; the client then opens a WebSocket straight to that named room.
+/live/join` asks room-1 … room-10 (`MAX_ROOMS`) for their open-socket count
+all at once (not player count — an unhelloed socket still holds a seat, or a
+saturated room would keep getting sent traffic) and returns the
+lowest-numbered with space; the client then opens a WebSocket straight to
+that named room. A reconnect passes `?prefer=<room it was last welcomed in>`
+and gets that room back while it has space. One IP may hold at most
+`IP_PER_ROOM` (4) open sockets in a room; the fifth upgrade is refused 429.
 
-The socket closes 4000 when a newer socket from the same player takes its
-seat — a second tab displaces the first, which does not reconnect — and 4001
-when the room filled before the hello landed, an ordinary drop that retries
-through the normal backoff rather than failing outright. A join that never
-connects at all, or a 1008 (a protocol/abuse verdict from the room), is
-final: the title screen shows why and stops retrying.
+Nothing is sent on a socket until its welcome arrives (`send()` returns
+false; poses are skipped and an attempt waits in the offline queue). The room
+marks a socket `helloing` before its hello's D1 lookup and silently drops
+anything else that arrives meanwhile — a reconnecting driver's car is already
+moving, and calling its first pose abuse once ejected everyone on every
+deploy. A player unseen for a whole round (no accepted pose, no attempt;
+`IDLE_MS` = `SLOT_MS`) is closed by the round's alarm, so a parked tab can't
+hold a seat. A late alarm that lands in the next round's racing sends no
+results, and a client takes a `results` message only for its loaded round
+and outside racing.
+
+Close codes, and what the client does:
+
+| Code | Meaning | Client |
+|---|---|---|
+| 4000 | a newer socket from the same player (a second tab) took the seat | final: "open in another tab" |
+| 4001 | the room filled before the hello landed | retry through the backoff |
+| 4002 | idle for a whole round | final: "You were idle, so you left the room." |
+| 4003 | no hello finished within `HELLO_MS` (10s) | retry through the backoff |
+| 1008 | protocol abuse: bad frame or JSON, a non-hello first message, a bad secret, strikes | final: "unavailable" |
+
+A join that never connects at all is final too. Leaving live reloads today's
+track if the daily was loaded on entry (so a session that crossed midnight
+UTC doesn't land on yesterday), else the track that was loaded.
 
 Your own ghost for a live attempt lives in memory only — `ghost.data` is set
 from the verified recording on an improved result, never written to
@@ -451,6 +476,10 @@ Conventions:
   `live-` branch and `clock.js` must be on `main` before a client that uses
   them; changing `SLOT_MS`/`RACING_MS`/`LIVE_EPOCH` changes every round's map
   at once, so only change them together with the worker.
+- **A live hello timeout is not an abuse verdict.** 1008 is final on the
+  client, so the room uses it only for genuine protocol abuse; anything a
+  slow network or a reconnect can cause (a pose mid-hello, a hello that
+  didn't finish) is dropped or closed with a retryable code (4001, 4003).
 - **Camera smoothing must be framerate-independent.** Use
   `1-Math.exp(-frameDt/tau)`, never a fixed per-frame lerp constant.
 - **Audio: never create nodes per frame.** Continuous sounds are persistent nodes
@@ -793,7 +822,7 @@ its recorded inputs; the replayed time is what gets stored. Routes are in
 `worker/src/index.js`: `POST /runs`, `GET /board`, `POST /name`,
 `POST /pair/start`, `POST /pair/approve`, `POST /pair/poll`, `GET /ghost`
 (a stored run's recording, for racing a leaderboard ghost), `GET /live/join`
-(the first room with space) and `GET /live/room/<name>` (the WebSocket
+(the lowest-numbered room with space, or `?prefer=`'s) and `GET /live/room/<name>` (the WebSocket
 upgrade into that room). CORS is limited to `ALLOWED_ORIGINS`
 in `wrangler.toml`: the GitHub Pages origin in production, localhost only
 under `wrangler dev --env dev`. Writes are rate limited per IP.
@@ -807,7 +836,8 @@ https://developers.cloudflare.com/durable-objects/platform/pricing/: the
 Workers Free plan gives Durable Objects 100,000 requests/day and
 13,000 GB-s/day of duration; incoming WebSocket messages are billed at a
 20:1 ratio (20 messages = 1 request), outgoing messages and pings are free.
-At 10Hz poses that's 10 incoming messages/s per driving player → 0.5 billed
+At 10Hz poses that's 10 incoming messages/s per driving player with company
+(a lone driver sends none) → 0.5 billed
 requests/s → 1,800 requests/hour, so the request quota alone caps the free
 plan at roughly 100,000 ÷ 1,800 ≈ 55 player-hours/day of driving before
 joins, attempts and results are even counted — the GB-s duration cap is the
