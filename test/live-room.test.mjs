@@ -124,3 +124,45 @@ test("a player with no stored name and no valid sent name is a Guest", () => {
   assert.equal(R.nameFor(null, "<script>"), "Guest");
   assert.equal(R.nameFor(null, undefined), "Guest");
 });
+
+test("an attempt's rate limit survives a rejoin and a leave+rejoin", () => {
+  const room = roomWith(A);
+  R.handle(room, A, attempt(14), T0, pass);
+  const reason = (msg, now) => R.handle(room, A, msg, now, pass).out[0].msg.reason;
+  // Rejoin (replaced socket)
+  R.join(room, A, "Pa", T0);
+  assert.equal(reason(attempt(13), T0 + 1000), "rate", "rate limit survives rejoin");
+  // Leave and rejoin
+  R.leave(room, A);
+  R.join(room, A, "Pa", T0);
+  assert.equal(reason(attempt(13), T0 + 2000), "rate", "rate limit survives leave+rejoin");
+  // After gap, accepted
+  const r = R.handle(room, A, attempt(13), T0 + 6000, pass);
+  assert.equal(r.out[0].msg.ok, true, "attempt accepted after gap");
+});
+
+test("strikes survive a leave and rejoin", () => {
+  const room = roomWith(A);
+  let r;
+  for (let i = 0; i < R.STRIKES_MAX; i++) {
+    r = R.handle(room, A, { t: "nonsense" }, T0 + i, pass);
+    assert.equal(r.close, false);
+  }
+  // One more strike closes the socket
+  r = R.handle(room, A, { t: "nonsense" }, T0 + R.STRIKES_MAX, pass);
+  assert.equal(r.close, true, "strikes close socket");
+  // Leave and rejoin
+  R.leave(room, A);
+  R.join(room, A, "Pa", T0);
+  // One more garbage closes immediately
+  r = R.handle(room, A, { t: "nonsense" }, T0 + R.STRIKES_MAX + 1, pass);
+  assert.equal(r.close, true, "strikes survive leave+rejoin");
+});
+
+test("a new round resets the attempt limit", () => {
+  const room = roomWith(A);
+  R.handle(room, A, attempt(14), T0, pass);
+  R.rollRound(room, roundStart(101) + 1000);
+  const r = R.handle(room, A, { t: "attempt", round: 101, inputs: INPUTS, time: 13 }, roundStart(101) + 1000, pass);
+  assert.equal(r.out[0].msg.ok, true, "new round allows attempt without rate delay");
+});

@@ -15,7 +15,7 @@ export const ATTEMPT_GAP_MS = 5000;    // a lap is ~12s+, so this only stops scr
 export const STRIKES_MAX = 20;         // dropped messages before the socket is closed
 
 export function createRoom() {
-  return { round: -1, best: new Map(), players: new Map() };
+  return { round: -1, best: new Map(), players: new Map(), limits: new Map() };
 }
 
 const info = p => ({ id: p.id, name: p.name, tag: p.tag });
@@ -23,7 +23,7 @@ const info = p => ({ id: p.id, name: p.name, tag: p.tag });
 /** Clear the standings when the wall clock has moved into a new round. */
 export function rollRound(room, now) {
   const r = roundAt(now);
-  if (r !== room.round) { room.round = r; room.best = new Map(); }
+  if (r !== room.round) { room.round = r; room.best = new Map(); room.limits = new Map(); }
 }
 
 export function standings(room) {
@@ -41,8 +41,9 @@ export function join(room, id, name, now) {
   rollRound(room, now);
   const replaced = room.players.has(id);
   if (!replaced && room.players.size >= ROOM_CAP) return { ok: false, replaced: false, out: [] };
-  const p = { id, name, tag: id.slice(0, 4), poses: [], lastAttempt: -Infinity, strikes: 0 };
+  const p = { id, name, tag: id.slice(0, 4), poses: [] };
   room.players.set(id, p);
+  if (!room.limits.has(id)) room.limits.set(id, { lastAttempt: -Infinity, strikes: 0 });
   const peers = [...room.players.values()].filter(q => q.id !== id).map(info);
   const out = [{ to: id, msg: { t: "welcome", now, round: room.round, standings: standings(room), peers } }];
   if (!replaced) out.push({ to: "others", msg: { t: "join", ...info(p) } });
@@ -61,7 +62,8 @@ export function handle(room, id, msg, now, verify) {
   const p = room.players.get(id);
   const none = { out: [], dirty: false, close: false };
   if (!p) return none;
-  const strike = () => ({ out: [], dirty: false, close: ++p.strikes > STRIKES_MAX });
+  const lim = room.limits.get(id) || { lastAttempt: -Infinity, strikes: 0 };
+  const strike = () => { lim.strikes++; return { out: [], dirty: false, close: lim.strikes > STRIKES_MAX }; };
   if (!msg || typeof msg !== "object") return strike();
 
   if (msg.t === "pose") {
@@ -74,10 +76,10 @@ export function handle(room, id, msg, now, verify) {
 
   if (msg.t === "attempt") {
     const refuse = reason => ({ out: [{ to: id, msg: { t: "attempt-result", ok: false, reason } }], dirty: false, close: false });
-    if (!validInputs(msg.inputs) || !validTime(msg.time)) { p.strikes++; return refuse("invalid"); }
+    if (!validInputs(msg.inputs) || !validTime(msg.time)) { lim.strikes++; return refuse("invalid"); }
     if (msg.round !== room.round || !open(room.round, now)) return refuse("closed");
-    if (now - p.lastAttempt < ATTEMPT_GAP_MS) { p.strikes++; return refuse("rate"); }
-    p.lastAttempt = now;
+    if (now - lim.lastAttempt < ATTEMPT_GAP_MS) { lim.strikes++; return refuse("rate"); }
+    lim.lastAttempt = now;
     const r = verify(seedFor(room.round), msg.inputs, msg.time);
     if (!r.ok) return refuse(r.reason || "rejected");
     const prev = room.best.get(id);
