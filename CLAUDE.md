@@ -291,7 +291,7 @@ and the room's, never the round itself. Changing `SLOT_MS`, `RACING_MS` or
 below.
 
 An attempt is one lap (`laps: 1`) from a standing start with a 1-tick
-countdown (`T_TICK`, so 1.8s — the daily race's is 3 ticks), submitted on
+countdown (`T_TICK`, 0.6s — the daily race's three ticks make 1.8s), submitted on
 finish and verified by the same replay path as the daily race with `laps: 1`
 passed through. Other players' positions (`pose` messages, 10Hz) are purely
 cosmetic: drawn as ghosts (`js/game/peers.js`) a fixed delay behind the
