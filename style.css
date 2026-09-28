@@ -321,3 +321,39 @@ body.live #liveresults{display:flex}
 }
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+
+/* The garage (ui/garage.js): a row on the title screen showing your car, and the
+   panel it opens. The panel swaps the sheet out the way body.run does, and widens
+   it so the cards go three across on a bigger screen. */
+#garagebtn{
+  width:100%;pointer-events:auto;display:flex;align-items:center;gap:12px;
+  background:rgba(232,240,255,.04);border:1px solid rgba(232,240,255,.12);border-radius:14px;
+  padding:6px 16px 6px 6px;color:var(--paper);font-family:inherit;cursor:pointer;text-align:left;
+}
+#garagebtn:active{background:rgba(47,227,255,.14);border-color:var(--ice)}
+#garagecar{width:104px;height:52px;display:block;flex:none}
+#garagename{flex:1;font-size:14px;letter-spacing:.06em}
+.garagego{font-size:22px;opacity:.5}
+#garage{display:none;width:100%;flex-direction:column;align-items:center;gap:14px;pointer-events:auto}
+body.garage #sheet{max-width:560px}
+body.garage #sheet > *:not(#garage){display:none}
+body.garage #garage{display:flex}
+#garagehead{font-size:13px;letter-spacing:.3em;opacity:.7}
+#garagecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%}
+.gcard{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:rgba(232,240,255,.04);border:1px solid rgba(232,240,255,.16);border-radius:14px;
+  padding:6px 8px 12px;color:var(--paper);font-family:inherit;cursor:pointer;
+}
+.gcard:active{background:rgba(47,227,255,.14)}
+.gcard[aria-pressed="true"]{border-color:var(--ice);box-shadow:0 0 14px rgba(47,227,255,.3)}
+.gcard canvas{width:100%;aspect-ratio:2/1;display:block}
+.gname{font-size:14px;font-weight:700;letter-spacing:.04em}
+.gchassis{font-size:11px;letter-spacing:.08em;opacity:.55}
+#garagedone{
+  background:transparent;border:1px solid var(--ice);color:var(--ice);
+  font-family:inherit;font-size:14px;letter-spacing:.16em;
+  padding:12px 34px;border-radius:99px;cursor:pointer;
+  box-shadow:0 0 22px rgba(47,227,255,.3),inset 0 0 22px rgba(47,227,255,.09);
+}
+#garagedone:active{background:rgba(47,227,255,.18)}

@@ -23,6 +23,7 @@ import "./net/leaderboard.js";  // subscribes to track-loaded and race-finish
 import "./ui/board.js";         // the leaderboard panel
 import "./ui/runui.js";        // the run's screens
 import "./ui/liveui.js";       // live mode's screens
+import "./ui/garage.js";       // the car picker; sets garage.car from storage
 
 forceWeather(WEATHER_PARAM);
 loadTrack(INITIAL_SEED);

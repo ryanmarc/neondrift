@@ -419,6 +419,7 @@ js/ui/      hud.js      per-frame readouts + end screen; subscribes to game even
             runui.js    the run button's best line, the offer screen, the run-over screen
             livehud.js  per-frame live readouts: round clock, rank, top five
             liveui.js   live's title status line, the leave buttons, the between-rounds results overlay
+            garage.js   the car picker: the title row, the panel of cards, neondrift:car; garageOpen/closeGarage for the pad
 ```
 
 Conventions:
@@ -735,9 +736,11 @@ events for sticks, so it is polled: `steer()` reads the first connected pad
 every physics step (a cheap snapshot, and the only place steering is read),
 and `ui/controls.js` polls at 60Hz for the menus. A focus ring
 (`.padfocus`) moves between the visible screen's primary buttons — those
-marked `data-pad`: the two title buttons, race again, the mod cards and
-Skip, the run-over pair — with the stick or d-pad in any direction; A
-presses the focused one, B is the R key, LB/RB are the day arrows. Every
+marked `data-pad`: the title buttons and the garage row, race again, the
+mod cards and Skip, the run-over pair, the garage's cards and Done — with
+the stick or d-pad in any direction; A presses the focused one, B is the R
+key, LB/RB are the day arrows. While the garage is open, B closes it and
+LB/RB do nothing, so the day can't change behind the panel. Every
 action goes through the button's own click handler, so the audio unlock,
 the line-computing guard and the run's Skip rule apply unchanged. The ring
 is drawn only once the pad has been used, so mouse and touch players never
@@ -758,6 +761,7 @@ by stubbing `navigator.getGamepads`.
 - `neondrift:name` — the display name
 - `neondrift:mute` — sound effects on/off, global
 - `neondrift:music` — music on/off, global
+- `neondrift:car` — the garage's chosen car id, global; unknown or missing is Neon
 - `neondrift:run:<day>:best` — best run for that day, `{ stages, prog, picks }`
 - `neondrift:run:best` — best run ever, the same shape plus `day`
 
@@ -945,3 +949,7 @@ part of the automated suite.
   party; only the public `room-<n>` pool is wired up.
 - **Live chat and spectating.** No text channel and no way to watch a room
   without a car in it.
+- **Your car for others to see.** The garage is local: rivals and live
+  players are drawn as Neon. Send the car id in the live `hello` so peers
+  draw it, and store it with each posted run so leaderboard and challenge
+  ghosts show it (a D1 column, validated against `CARS` ids).

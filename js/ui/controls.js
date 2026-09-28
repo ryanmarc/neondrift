@@ -15,6 +15,7 @@ import { padState, risingEdges, firstPad, stepIndex } from "../input/gamepad.js"
 import { emit } from "../core/events.js";
 import { live } from "../live/state.js";
 import { enterLive, restartAttempt } from "../live/live.js";
+import { garageOpen, closeGarage } from "./garage.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
@@ -30,7 +31,7 @@ $("go").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) r
 $("gorun").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); startRun(runDay()); });
 $("golive").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); enterLive(); });
 $("restart").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); restart(); });
-addEventListener("keydown", e => { if ((e.key === "r" || e.key === "R") && canStart()) restart(); });
+addEventListener("keydown", e => { if ((e.key === "r" || e.key === "R") && canStart() && !garageOpen()) restart(); });
 
 const $guides = $("guidetoggle");
 if (!guides.flag) $guides.style.display = "none";
@@ -67,8 +68,9 @@ $cam.addEventListener("click", e => {
 //
 // Steering is polled by input.js; this is the rest of the pad. A focus ring
 // moves between the visible screen's primary buttons (those marked data-pad:
-// the three title buttons, race again, the mod cards and Skip, the run-over
-// pair), A presses the focused one, B is the R key, LB/RB are the day arrows.
+// the title buttons and the garage row, race again, the mod cards and Skip, the
+// run-over pair, the garage's cards and Done), A presses the focused one, B is the
+// R key, B closes the garage while it is open, LB/RB are the day arrows.
 // Everything goes through the buttons' own click handlers, so the audio
 // unlock, the line-computing guard and the run's Skip rule apply unchanged.
 // Secondary links (rename, pairing, toggles) stay mouse-only on purpose:
@@ -97,6 +99,9 @@ function pollPad() {
   padEl = next;
   if (padEl) padEl.classList.toggle("padfocus", padUsed);
   if (e.a && padEl) padEl.click();
+  // the garage panel is a screen over the title: B closes it, and nothing
+  // may restart the race or change the day behind it
+  if (garageOpen()) { if (e.b) closeGarage(); return; }
   if (e.b && canStart()) restart();
   if (e.lb) $("dayprev").click();
   if (e.rb) $("daynext").click();
