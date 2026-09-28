@@ -39,8 +39,11 @@ export const T = {
 // see track/weather.js). Set by test/wet-physics.test.mjs. Dry multiplies by
 // exactly 1, so it is bit-identical.
 export const WET = {
-  grip: 0.55,      // gripMax, gripSlide and stiffness: less bite everywhere
-  recover: 1.7,    // chargeDown: traction comes back slower, so slides last
+  grip: 0.40,      // gripMax, gripSlide and stiffness: less bite everywhere
+  recover: 2.3,    // chargeDown: traction comes back slower, so slides last
+  align: 0.6,      // align: grip alone barely moves the settled angle (align sets it),
+                   // so a weaker aligning force is what lets the back swing wider and hang
+  zeta: 0.8,       // zeta: less yaw damping, so the nose fishtails as it comes back
   speed: 0.94,     // maxSpeed and boostSpeed: standing water costs top speed
   fill: 1.15,      // boostFill: the longer slides pay a little more
 };

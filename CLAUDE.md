@@ -113,7 +113,8 @@ relatively, or inline it as a `data:` URI.
 - **Weather.** Seeded ~1 in 5 from `WEATHER_CUTOVER` (2026-10-01) by
   `track/weather.js`; dailies and each run stage roll independently, so a wet
   daily says nothing about its stages. `track.wet` makes `integrate()` apply
-  `WET` (grip, recovery, top speed, boost fill) on top of `P`; dry multiplies
+  `WET` (grip, recovery, aligning force, yaw damping, top speed, boost fill)
+  on top of `P`; dry multiplies
   by 1, pinned by `test/wet-physics.test.mjs`. Rain, a wet road, wheel spray
   and a rain bed are drawn and synthesized on wet tracks; the offer screen
   says "NEXT STAGE: WET".
@@ -130,7 +131,7 @@ every run end — a capped drain let a chain-keeping build refill forever. It is
 refilled only while sliding on the
 road, scaled by speed and the chain multiplier — so drifting well is what
 keeps you alive, not just finishing laps. On a wet stage the refill is scaled
-again by `TIMER.wetGain` (0.87): a wet drive slides more, so the raw refill
+again by `TIMER.wetGain` (0.73): a wet drive slides longer and wider, so the raw refill
 would outrun dry's net clock, and `wetGain` brings the two to near-equal net
 across stages 1–8, pooled over several days
 (`test/wet-run.test.mjs`, within 5% of total dry refill — a single day's net
@@ -511,12 +512,20 @@ by exactly 1, so it is bit-identical. Set by `test/wet-physics.test.mjs`.
 
 | Knob | Does what |
 |---|---|
-| `grip` (0.55) | Scales `gripMax`, `gripSlide` and `stiffness` — less bite everywhere. |
-| `recover` (1.7) | Scales `chargeDown` — traction comes back slower, so slides last longer. |
+| `grip` (0.40) | Scales `gripMax`, `gripSlide` and `stiffness` — less bite everywhere. |
+| `recover` (2.3) | Scales `chargeDown` — traction comes back slower, so slides last longer. |
+| `align` (0.6) | Scales `align` — the back swings wider and straightens lazily. |
+| `zeta` (0.8) | Scales `zeta` — less yaw damping, so the nose fishtails on the way back. |
 | `speed` (0.94) | Scales `maxSpeed` and `boostSpeed` — standing water costs top speed. |
 | `fill` (1.15) | Scales `boostFill` — the longer slides pay a little more boost. |
 
-The four values were set by two bars, not eyeballed: the feel bar (a driven
+**Grip alone doesn't make it feel wet.** The settled drift angle comes from
+`align`, not grip: grip ×0.40 still settled at dry's ~35° and peaked at
+dry's 52°, and a playtest called it "grippy and similar to dry". Weakening
+the aligning force (×0.6) is what changes the feel: the peak angle goes to
+~64°, and grip takes ~0.24s to return after a release against dry's 0.13s.
+
+The values were then checked against two bars: the feel bar (a driven
 lap must move at least one handling metric — lap time, peak speed, slide
 seconds or grip-recovery time — 15% in the wet direction on a fixed seed) and
 the drivability bar (the bootstrap controller must still clear every drift

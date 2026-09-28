@@ -47,13 +47,15 @@ export function placeCar(car, s) {
  * keeps firing while steering), `multSpeed` (0, top speed per ×1 of chain)
  * and `offFree` (0, excursions per stage that don't cut the chain).
  * On a wet track (track.wet) grip, recovery, top speed and boost fill are
- * scaled by WET; dry multiplies by 1, which is exact.
+ * scaled by WET, and so are the aligning force and yaw damping; dry multiplies
+ * by 1, which is exact.
  */
 export function integrate(car, inp, dt, window = 45, P = T) {
   let flags = 0;
   const wet = track.wet;
   const kGrip = wet ? WET.grip : 1, kRec = wet ? WET.recover : 1;
   const kSpeed = wet ? WET.speed : 1, kFill = wet ? WET.fill : 1;
+  const kAlign = wet ? WET.align : 1, kZeta = wet ? WET.zeta : 1;
   car.px = car.x; car.py = car.y; car.pa = car.a;   // previous state, for render interpolation
 
   if (inp !== 0) car.charge = Math.min(1, car.charge + dt / P.chargeUp);
@@ -77,7 +79,10 @@ export function integrate(car, inp, dt, window = 45, P = T) {
     // first-order system mathematically cannot do. om is derived from align and zeta so
     // the settled drift angle is unchanged; zeta alone controls the settling character.
     const w = (inp === 0 ? 0.90 : 0.50) * clamp(speed / 240, 0, 1);
-    const om = 2 * P.zeta * P.align, damp = 2 * P.zeta * om;
+    // Wet: a weaker aligning force lets the back swing wider and straighten
+    // lazily, and less damping lets it fishtail on the way back.
+    const zeta = P.zeta * kZeta;
+    const om = 2 * zeta * (P.align * kAlign), damp = 2 * zeta * om;
     const yawAcc = om * om * shape * w - damp * car.av + inp * P.turn * turnScale * damp;
     car.av += yawAcc * dt;
     car.a += car.av * dt;

@@ -16,8 +16,8 @@ export const TIMER = {
   knee: 8,        // The knee is what keeps a single wall survivable; the creep is what makes
                   // every run end. A capped drain let a chain-keeping build refill forever.
   refill: 1.8,    // slide refill gain — see tickTimer for the formula
-  wetGain: 0.87,  // refill multiplier on a wet stage — sliding more on wet (lower grip,
-                  // slower recovery) makes the raw refill outrun dry's net clock; this
+  wetGain: 0.73,  // refill multiplier on a wet stage — sliding longer and wider on wet
+                  // (weaker grip and aligning force) makes the raw refill outrun dry's net clock; this
                   // brings the two to near-equal net across a spread of days, the balance
                   // test/wet-run.test.mjs pools and checks (a single day's noise made an
                   // earlier ±10%-of-net band too easy to satisfy by accident).
