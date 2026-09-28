@@ -12,11 +12,28 @@ ALLOWED_ORIGINS = "https://ryanmarc.github.io"
 [env.dev]
 vars = { ALLOWED_ORIGINS = "http://localhost:8000,http://127.0.0.1:8000", ALLOW_LAN = "1" }
 d1_databases = [{ binding = "DB", database_name = "neondrift", database_id = "95cd3136-5fd2-4b58-98fd-e2c57d2b7e2e" }]
+durable_objects = { bindings = [{ name = "ROOM", class_name = "Room" }] }
 
 [[d1_databases]]
 binding = "DB"
 database_name = "neondrift"
 database_id = "95cd3136-5fd2-4b58-98fd-e2c57d2b7e2e"
+
+# Live mode: one Durable Object per room (worker/src/live.js). Free-plan
+# Durable Objects are SQLite-backed, hence new_sqlite_classes.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[[unsafe.bindings]]
+name = "JOIN_LIMIT"
+type = "ratelimit"
+namespace_id = "1004"
+simple = { limit = 20, period = 60 }
 
 [[unsafe.bindings]]
 name = "POST_LIMIT"

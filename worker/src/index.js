@@ -1,13 +1,17 @@
-// Neon Drift leaderboard API. Seven routes, JSON in and out, CORS to the game's
+// Neon Drift leaderboard API. Nine routes, JSON in and out, CORS to the game's
 // origin, per-IP rate limits on writes. Times are never trusted: /runs
 // replays the submitted inputs through the game's physics and stores what
 // that produces. Pairing never hands a secret to whoever types a code: the
 // new device shows the code and collects with a private token; the device
 // that already has the secret is the one that types (see /pair/*).
+// /live/join and /live/room/<name> are the live mode (live.js): a Durable
+// Object per room.
 
 import { replay, trackFor } from "./replay.js";
 import * as v from "./validate.js";
 import * as db from "./db.js";
+import { sha256Hex } from "./hash.js";
+import { Room, joinRoom, ROOM_NAME } from "./live.js";
 
 const TOP_N = 10;
 const PAIR_TTL_MS = 5 * 60 * 1000;   // long enough to walk to the other device; short enough to bound polling
@@ -15,11 +19,6 @@ const PAIR_TTL_MS = 5 * 60 * 1000;   // long enough to walk to the other device;
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
 const bad = (error, status = 400) => json({ error }, status);
-
-async function sha256Hex(s) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
-}
 
 function randomCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
@@ -154,6 +153,22 @@ async function pairPoll(body, env) {
   return json({ status: "ready", secret: r.secret, name });
 }
 
+// ---------- live ----------
+
+/** The room socket: checks run before the request reaches a Durable Object. */
+async function liveRoom(request, env, name) {
+  // Browsers always send Origin on a WebSocket; the same allow-list as CORS applies.
+  if (!Object.keys(corsHeaders(request, env)).length) return bad("forbidden-origin", 403);
+  if (!ROOM_NAME.test(name)) return bad("invalid-room");
+  if (request.headers.get("upgrade") !== "websocket") return bad("expected-websocket", 426);
+  // A script could otherwise mint fresh secrets and connect straight to a room
+  // for unbounded attempt budgets, skipping /live/join entirely.
+  if (await limited(env.JOIN_LIMIT, request)) return bad("rate-limited", 429);
+  return env.ROOM.get(env.ROOM.idFromName(name)).fetch(request);
+}
+
+export { Room };
+
 export default {
   async fetch(request, env) {
     const cors = corsHeaders(request, env);
@@ -165,6 +180,11 @@ export default {
       return res;
     };
     try {
+      if (request.method === "GET" && url.pathname.startsWith("/live/room/")) return liveRoom(request, env, url.pathname.slice(11));
+      if (request.method === "GET" && url.pathname === "/live/join") {
+        if (await limited(env.JOIN_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
+        return withCors(async () => { const room = await joinRoom(env); return room ? json({ room }) : bad("full", 503); });
+      }
       if (request.method === "GET" && url.pathname === "/board") return withCors(() => getBoard(url, env));
       if (request.method === "GET" && url.pathname === "/ghost") return withCors(() => getGhost(url, env));
       if (request.method === "POST") {
