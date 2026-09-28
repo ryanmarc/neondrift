@@ -30,9 +30,10 @@ export function trackFor(seed) {
  * @param inputs       flat [step, input, …] of input changes
  * @param ghost        the client's 30Hz [x, y, a, progress, …] recording (may be empty)
  * @param claimedTime  the client's finishing time
+ * @param laps         laps that finish the run (default LAPS; a live attempt is 1)
  * @returns { ok, time, reason?, maxDeviation }
  */
-export function replay(seed, inputs, { ghost = [], claimedTime = null } = {}) {
+export function replay(seed, inputs, { ghost = [], claimedTime = null, laps = LAPS } = {}) {
   trackFor(seed);
   const car = createCar();
   placeCar(car, track.samples[0]);
@@ -54,7 +55,7 @@ export function replay(seed, inputs, { ghost = [], claimedTime = null } = {}) {
       }
       frame++;
     }
-    if (car.lap > LAPS) {
+    if (car.lap > laps) {
       if (claimedTime != null && Math.abs(time - claimedTime) > TIME_TOLERANCE) {
         return { ok: false, time, reason: "time-mismatch", maxDeviation };
       }
