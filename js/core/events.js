@@ -22,6 +22,13 @@
 //   run-over ({ score, best, isBest, picks }) – the timer hit zero
 //   timer-low                     – the clock dipped under TIMER.low
 //   second-wind                   – the clock hit zero and a Second wind refilled it (run/run.js)
+//   live-state                    – live status, round or standings changed (live/live.js)
+//   live-round (n)                – live round n's map is loaded
+//   live-standing ({ id, name, tag, time }) – someone set a verified best this round
+//   live-attempt ({ ok, time, improved, reason }) – the room's verdict on your lap
+//   live-results ({ round, rows }) – the round's final ranking
+//   live-peer-join ({ id, name, tag }) / live-peer-leave ({ id })
+//   live-leave                    – left live mode; the daily track is back
 
 const listeners = new Map();
 
