@@ -9,6 +9,7 @@ import { guides } from "../track/guides.js";
 import { line } from "../sim/line.js";
 import { car, race } from "../game/state.js";
 import { ghost, ghostAt } from "../game/ghost.js";
+import { peers, peerPose } from "../game/peers.js";
 import { camera, updateCamera } from "./camera.js";
 import { createRain, rainCount, stepRain, drawRain } from "./rain.js";
 
@@ -20,6 +21,7 @@ const COLOR = {
   startLine: "rgba(232,240,255,.16)",
   ghostBody: "rgba(47,227,255,.30)", ghostGlow: "rgba(47,227,255,.07)",
   rivalBody: "rgba(255,47,158,.45)", rivalGlow: "rgba(255,47,158,.10)",
+  peerBody: "rgba(255,197,61,.28)", peerGlow: "rgba(255,197,61,.06)", peerLabel: "rgba(232,240,255,.55)",
   offTint: "rgba(255,47,158,.10)",
   roadWet: "#070914", tireMarkWet: "rgba(165,190,245,.07)", spray: "232,240,255",
 };
@@ -97,6 +99,25 @@ export function draw(dt, alpha) {
   }
 
   drawStartLine(S[0]);
+
+  // live mode's other players: fainter than your own ghost, each with a label
+  // that stays upright and screen-sized whatever the camera does
+  if (peers.size) {
+    const now = performance.now();
+    cx.font = "600 11px 'Chakra Petch', system-ui, sans-serif"; cx.textAlign = "center";
+    for (const p of peers.values()) {
+      const q = peerPose(p, now);
+      if (!q || !inView(q.x, q.y)) continue;
+      cx.globalAlpha = q.alpha;
+      drawCar(q.x, q.y, q.a, COLOR.peerBody, COLOR.peerGlow, true);
+      cx.save();
+      cx.translate(q.x, q.y); cx.rotate(-camera.a); cx.scale(1 / camera.z, 1 / camera.z);
+      cx.fillStyle = COLOR.peerLabel;
+      cx.fillText(p.name + "#" + p.tag, 0, -26);
+      cx.restore();
+      cx.globalAlpha = 1;
+    }
+  }
 
   const gp = ghostAt(race.time);
   if (gp) {
