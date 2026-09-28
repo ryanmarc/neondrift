@@ -307,12 +307,15 @@ in the room — alone, nobody would draw them and every incoming message is
 billed.
 
 Rooms hold 16 players (`ROOM_CAP`). There is no lobby object: `GET
-/live/join` asks room-1 … room-10 (`MAX_ROOMS`) for their open-socket count
-all at once (not player count — an unhelloed socket still holds a seat, or a
-saturated room would keep getting sent traffic) and returns the
-lowest-numbered with space; the client then opens a WebSocket straight to
-that named room. A reconnect passes `?prefer=<room it was last welcomed in>`
-and gets that room back while it has space. One IP may hold at most
+/live/join` asks room-1, room-2 … up to room-10 (`MAX_ROOMS`) for their
+open-socket count one at a time (not player count — an unhelloed socket still
+holds a seat, or a saturated room would keep getting sent traffic) and
+returns the first with space; the client then opens a WebSocket straight to
+that named room. Sequential, not parallel: every count is a billed request
+that wakes a room, so asking all ten at once cost ten requests per join and
+woke nine empty rooms. Now the usual join costs one. A reconnect passes
+`?prefer=<room it was last welcomed in>`, asked first, and gets that room back
+while it has space. One IP may hold at most
 `IP_PER_ROOM` (4) open sockets in a room; the fifth upgrade is refused 429.
 
 Nothing is sent on a socket until its welcome arrives (`send()` returns

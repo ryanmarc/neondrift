@@ -31,18 +31,20 @@ async function count(env, name) {
 }
 
 /**
- * GET /live/join: the lowest-numbered room with space, every room asked at
- * once. A reconnecting client names the room it was in (`prefer`) and gets it
- * back while it has space, so a dropped socket doesn't scatter a group.
+ * GET /live/join: the lowest-numbered room with space, asked one at a time and
+ * stopping at the first. Each count is a billed request that wakes the room, so
+ * the common case (room-1 has space) costs one; only a nearly full pool walks
+ * further, and never past MAX_ROOMS. A reconnecting client names the room it
+ * was in (`prefer`), asked first, so a dropped socket doesn't scatter a group.
  */
 export async function joinRoom(env, prefer = null) {
-  const names = Array.from({ length: MAX_ROOMS }, (_, k) => "room-" + (k + 1));
   const want = typeof prefer === "string" && ROOM_NAME.test(prefer) ? prefer : null;
-  const ask = want && !names.includes(want) ? [...names, want] : names;
-  const n = await Promise.all(ask.map(name => count(env, name)));
-  const space = name => n[ask.indexOf(name)] < core.ROOM_CAP;
-  if (want && space(want)) return want;
-  return names.find(space) || null;
+  if (want && await count(env, want) < core.ROOM_CAP) return want;
+  for (let k = 1; k <= MAX_ROOMS; k++) {
+    const name = "room-" + k;
+    if (name !== want && await count(env, name) < core.ROOM_CAP) return name;
+  }
+  return null;
 }
 
 export class Room {

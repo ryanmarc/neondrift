@@ -39,20 +39,27 @@ test("join returns the first room with space", async () => {
   assert.deepEqual(await (await get(env({ "room-1": 16, "room-2": 3 }), "/live/join")).json(), { room: "room-2" });
 });
 
-test("join asks all 10 rooms at once and picks the lowest-numbered with space", async () => {
+test("join asks rooms one at a time and stops at the first with space", async () => {
+  const quiet = env({ "room-1": 3 });
+  assert.deepEqual(await (await get(quiet, "/live/join")).json(), { room: "room-1" });
+  assert.deepEqual(quiet.ROOM.asked, ["room-1"], "the common case wakes one room, not ten");
   const full = Object.fromEntries(Array.from({ length: 10 }, (_, k) => ["room-" + (k + 1), 16]));
   const e = env({ ...full, "room-3": 5, "room-7": 0 });
   assert.deepEqual(await (await get(e, "/live/join")).json(), { room: "room-3" });
-  assert.equal(e.ROOM.asked.length, 10);
-  assert.equal(e.ROOM.maxInFlight, 10, "the counts are asked in parallel, not one after another");
+  assert.deepEqual(e.ROOM.asked, ["room-1", "room-2", "room-3"]);
+  assert.equal(e.ROOM.maxInFlight, 1, "one count at a time");
   const all = env(full);
   assert.equal((await get(all, "/live/join")).status, 503);
-  assert.ok(!all.ROOM.asked.includes("room-11"), "no more than 10 rooms");
+  assert.equal(all.ROOM.asked.length, 10, "no more than 10 rooms");
 });
 
 test("join returns the preferred room while it has space, else the normal pick", async () => {
-  assert.deepEqual(await (await get(env({}), "/live/join?prefer=room-5")).json(), { room: "room-5" });
-  assert.deepEqual(await (await get(env({ "room-5": 16 }), "/live/join?prefer=room-5")).json(), { room: "room-1" });
+  const e = env({});
+  assert.deepEqual(await (await get(e, "/live/join?prefer=room-5")).json(), { room: "room-5" });
+  assert.deepEqual(e.ROOM.asked, ["room-5"], "a reconnect with space costs one request");
+  const full5 = env({ "room-5": 16 });
+  assert.deepEqual(await (await get(full5, "/live/join?prefer=room-5")).json(), { room: "room-1" });
+  assert.deepEqual(full5.ROOM.asked, ["room-5", "room-1"]);
   assert.deepEqual(await (await get(env({}), "/live/join?prefer=lobby")).json(), { room: "room-1" });
 });
 
