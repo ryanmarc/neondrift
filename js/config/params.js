@@ -79,6 +79,11 @@ export const WEATHER_PARAM = WX === "wet" || WX === "dry" ? WX : null;
 // to the page URL to enable them without editing this file.
 export const GUIDES_FLAG = false || QS.has("guides");
 
+// FEATURE FLAG: live mode, dark launched. Off by default: the title screen has
+// no Live section. Append ?live to show it, or flip to true here to launch it.
+// Only the button is hidden — the worker's live routes stay up either way.
+export const LIVE_FLAG = false || QS.has("live");
+
 
 // Leaderboard API. Served from localhost or a private LAN address (a phone on
 // the same wifi opening http://192.168.x.x:8000) the game talks to the local

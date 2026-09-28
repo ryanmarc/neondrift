@@ -10,6 +10,10 @@ import { leaveLive } from "../live/live.js";
 import { playerId } from "../net/identity.js";
 import { setMyId } from "./livehud.js";
 import { race } from "../game/state.js";
+import { LIVE_FLAG } from "../config/params.js";
+
+// dark launch: without ?live the title screen has no Live section at all
+if (!LIVE_FLAG) $("livemode").style.display = "none";
 
 const $overlay = $("overlay"), $status = $("livestatus");
 const $head = $("lrhead"), $list = $("lrlist"), $next = $("lrnext");

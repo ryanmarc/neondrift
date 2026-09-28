@@ -36,6 +36,10 @@ below works with it unchanged.
   leaderboard panel, which appears once you have a posted time.
 - `?guides` — show the drift guide markers. Turning guides on also computes
   the optimal line for the track (see below) and switches the markers to it.
+- `?live` — show the Live section on the title screen. Live mode is dark
+  launched: `LIVE_FLAG` in `config/params.js` is false, so without the param
+  nobody sees the button. Only the entry point is hidden; the worker's live
+  routes are deployed and answer regardless. Flip the flag to launch.
 - `?weather=wet|dry` — force the weather for testing. A forced run is
   practice: not saved as a best, not posted (the worker replays on the seed's
   own weather). Practice either way, even when the value matches what the
