@@ -13,6 +13,8 @@ import { camera } from "./render/camera.js";
 import { line, ensureLine } from "./sim/line.js";
 import { run as runState } from "./run/state.js";
 import { startRun, pick, restart as restartRun, abandon } from "./run/run.js";
+import { live } from "./live/state.js";
+import { enterLive, leaveLive } from "./live/live.js";
 import "./audio/sfx.js";       // subscribes to game events
 import "./game/daily.js";     // rolls the daily track over at midnight UTC
 import "./ui/hud.js";          // subscribes to game events
@@ -20,6 +22,7 @@ import "./ui/controls.js";     // wires the buttons
 import "./net/leaderboard.js";  // subscribes to track-loaded and race-finish
 import "./ui/board.js";         // the leaderboard panel
 import "./ui/runui.js";        // the run's screens
+import "./ui/liveui.js";       // live mode's screens
 
 forceWeather(WEATHER_PARAM);
 loadTrack(INITIAL_SEED);
@@ -30,4 +33,4 @@ run();
 // Poke at live state from the browser console: neon.car, neon.race, neon.track…
 // neon.start(); neon.tick(t) in a loop drives a run with synthetic timestamps (hidden tab only).
 window.neon = { car, race, track, ghost, guides, camera, line, loadTrack, start, tick, ensureLine,
-  run: runState, startRun, pick, restartRun, abandon };
+  run: runState, startRun, pick, restartRun, abandon, live, enterLive, leaveLive };

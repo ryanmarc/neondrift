@@ -13,6 +13,8 @@ import { run } from "../run/state.js";
 import { startRun } from "../run/run.js";
 import { padState, risingEdges, firstPad, stepIndex } from "../input/gamepad.js";
 import { emit } from "../core/events.js";
+import { live } from "../live/state.js";
+import { enterLive, restartAttempt } from "../live/live.js";
 
 // Audio must unlock inside a real tap handler — iOS refuses otherwise, and
 // deferring it even one frame fails. So every start button unlocks first.
@@ -21,11 +23,12 @@ import { emit } from "../core/events.js";
 const canStart = () => line.status !== "computing";
 // Restart is the daily race's only. A run has no restart: its screens offer
 // "run again" and "back to the daily race" at the end, and the button is hidden.
-const restart = () => { if (!run.active) start(); };
+const restart = () => { if (live.active) restartAttempt(); else if (!run.active) start(); };
 // A run belongs to the day on the title screen, so the day browser gives past days' runs too.
 const runDay = () => isDateSeed(track.seed) ? track.seed : todayUtc();
 $("go").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); start(); });
 $("gorun").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); startRun(runDay()); });
+$("golive").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); enterLive(); });
 $("restart").addEventListener("click", e => { e.stopPropagation(); if (!canStart()) return; SFX.unlock(); restart(); });
 addEventListener("keydown", e => { if ((e.key === "r" || e.key === "R") && canStart()) restart(); });
 
@@ -64,7 +67,7 @@ $cam.addEventListener("click", e => {
 //
 // Steering is polled by input.js; this is the rest of the pad. A focus ring
 // moves between the visible screen's primary buttons (those marked data-pad:
-// the two title buttons, race again, the mod cards and Skip, the run-over
+// the three title buttons, race again, the mod cards and Skip, the run-over
 // pair), A presses the focused one, B is the R key, LB/RB are the day arrows.
 // Everything goes through the buttons' own click handlers, so the audio
 // unlock, the line-computing guard and the run's Skip rule apply unchanged.

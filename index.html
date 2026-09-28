@@ -20,11 +20,14 @@
       <div id="lap">Lap 1 of 3</div>
       <div id="runstage"></div>
       <div id="runbest"></div>
+      <div id="liveclock"></div>
     </div>
     <div id="rightstack">
       <div id="delta"></div>
       <div id="best"></div>
       <div id="runtimer"></div>
+      <div id="liverank"></div>
+      <ol id="livetop"></ol>
     </div>
   </div>
 
@@ -43,6 +46,7 @@
   <button class="btn" id="mute">Sound FX: on</button>
   <button class="btn" id="musictoggle">Music: on</button>
   <button class="btn" id="guidetoggle">Guides: on</button>
+  <button class="btn" id="liveexit">Leave</button>
 
   <div id="overlay">
     <div id="sheet">
@@ -68,6 +72,12 @@
         <div id="romods"></div>
         <button id="runagain" data-pad>RUN AGAIN</button>
         <button type="button" class="link" id="rundaily" data-pad>back to the daily race</button>
+      </div>
+      <div id="liveresults">
+        <div id="lrhead"></div>
+        <ol id="lrlist"></ol>
+        <div id="lrnext"></div>
+        <button id="liveleave" data-pad>LEAVE LIVE</button>
       </div>
       <div id="howto">
         <p id="rule">Hold <b>either side</b> of the screen to turn.</p>
@@ -102,6 +112,12 @@
         <button id="gorun" data-pad>RUN THE GAUNTLET</button>
         <p id="runblurb">Chained tracks, a clock only drifting refills, a mod between each. Same run for everyone.</p>
         <div id="runbestline"></div>
+      </section>
+      <section class="mode" id="livemode">
+        <div class="modehead">LIVE</div>
+        <button id="golive" data-pad>RACE LIVE</button>
+        <p id="liveblurb">Everyone on one map for three minutes. Best single lap wins, then a new map.</p>
+        <div id="livestatus"></div>
       </section>
       <div id="devices">
         <div id="devicelinks">

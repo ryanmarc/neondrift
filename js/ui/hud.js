@@ -14,6 +14,8 @@ import { line } from "../sim/line.js";
 import { canGoDay, gotoDay, gotoToday } from "../game/daily.js";
 import { run } from "../run/state.js";
 import { updateRunHud } from "./runhud.js";
+import { live } from "../live/state.js";
+import { updateLiveHud } from "./livehud.js";
 
 const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best");
 const $fill = $("fill"), $chain = $("chain"), $meter = $("meter");
@@ -40,6 +42,7 @@ export function updateHud() {
       $delta.textContent = (d >= 0 ? "+" : "") + d.toFixed(2);
       $delta.style.color = d < 0 ? "#2fe3ff" : "#ff2f9e";
     } else $delta.textContent = "";
+    if (live.active) updateLiveHud();
   }
   // the boost bar and the chain are shared by both modes
   $fill.style.width = (car.boost / race.params.boostCap * 100) + "%";   // a run's Long tank raises the cap

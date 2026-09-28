@@ -255,6 +255,36 @@ body.run #sheet > *:not(#offer):not(#runover):not(#footer){display:none}
 body.run #clearghost{display:none!important}
 #offer,#runover{display:none;width:100%;flex-direction:column;align-items:center;gap:14px;pointer-events:auto}
 #offer.on,#runover.on{display:flex}
+
+/* ---------- live mode ---------- */
+#liveclock,#liverank,#livetop,#liveexit,#liveresults{display:none}
+body.live #lap,body.live #guidetoggle{display:none}
+body.live #liveclock,body.live #liverank,body.live #livetop,body.live #liveexit{display:block}
+body.live #sheet > *:not(#liveresults):not(#footer){display:none}
+body.live #clearghost{display:none!important}
+body.live #liveresults{display:flex}
+#liveexit{top:calc(env(safe-area-inset-top,0px) + 256px);right:16px}
+#liveclock{font-size:13px;opacity:.65;margin-top:3px;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+#liverank{font-size:12px;opacity:.7;margin-top:4px;font-variant-numeric:tabular-nums}
+#livetop{list-style:none;margin:6px 0 0;padding:0;font-size:11px;line-height:1.5;opacity:.55;font-variant-numeric:tabular-nums}
+#livetop .me,#lrlist .me{color:var(--ice);opacity:1}
+#livetop .tag,#lrlist .tag{opacity:.5}
+#liveresults{width:100%;flex-direction:column;align-items:center;gap:14px;pointer-events:auto}
+#lrhead{font-size:13px;letter-spacing:.3em;opacity:.7}
+#lrlist{list-style:none;margin:0;padding:0;width:100%;max-width:340px;font-variant-numeric:tabular-nums}
+#lrlist li{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px solid rgba(232,240,255,.08)}
+#lrnext{font-size:12px;opacity:.55;letter-spacing:.06em}
+#golive{
+  pointer-events:auto;
+  background:transparent;border:1px solid var(--ice);color:var(--ice);
+  font-family:inherit;font-size:14px;letter-spacing:.16em;
+  padding:14px 34px;border-radius:99px;cursor:pointer;
+  box-shadow:0 0 22px rgba(47,227,255,.3),inset 0 0 22px rgba(47,227,255,.09);
+}
+#golive:active{background:rgba(47,227,255,.18)}
+#liveblurb{margin:0;max-width:30ch;font-size:13px;line-height:1.55;opacity:.6;text-wrap:pretty}
+#livestatus{font-size:12px;opacity:.6;letter-spacing:.06em;min-height:1px}
+
 #offerhead,#rohead{font-size:13px;letter-spacing:.3em;opacity:.7;font-variant-numeric:tabular-nums}
 #cards{display:flex;flex-direction:column;gap:10px;width:100%}
 .card{

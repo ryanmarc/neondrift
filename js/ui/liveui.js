@@ -1,0 +1,59 @@
+// Live mode's screens: the title section's status line, the results between
+// rounds, and the Leave buttons. Reacts to live events; drives the mode only
+// through live/live.js's exported actions.
+
+import { $ } from "../core/dom.js";
+import { on } from "../core/events.js";
+import { live, serverNow } from "../live/state.js";
+import { phaseAt } from "../live/clock.js";
+import { leaveLive } from "../live/live.js";
+import { playerId } from "../net/identity.js";
+import { setMyId } from "./livehud.js";
+import { race } from "../game/state.js";
+
+const $overlay = $("overlay"), $status = $("livestatus");
+const $head = $("lrhead"), $list = $("lrlist"), $next = $("lrnext");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+const STATUS = {
+  joining: "Joining…",
+  unavailable: "Live is unavailable right now.",
+  displaced: "Live is open in another tab.",
+};
+
+let myId = null;
+
+function rows(list) {
+  if (!list.length) return '<li><span>No laps set this round.</span></li>';
+  return list.map((s, k) =>
+    '<li class="' + (s.id === myId ? "me" : "") + '"><span>' + (k + 1) + ". " + esc(s.name) + '<span class="tag">#' + esc(s.tag) + "</span></span><span>" + s.time.toFixed(2) + "</span></li>").join("");
+}
+
+/** Between rounds (or waiting to join one): the overlay shows the standings. */
+function showWaiting() {
+  const final = !!live.results;
+  $head.textContent = final ? "ROUND RESULTS" : "ROUND ENDING";
+  $list.innerHTML = rows(live.standings);
+  $overlay.classList.remove("gone");
+}
+
+function tickNext() {
+  if (!live.active) return;
+  const ph = phaseAt(serverNow());
+  $next.textContent = ph.racing ? "" : "Next map in " + Math.ceil(ph.left) + "s";
+  if (!ph.racing && !race.running && $overlay.classList.contains("gone")) showWaiting();
+}
+setInterval(tickNext, 250);
+
+on("live-state", async () => {
+  document.body.classList.toggle("live", live.active);
+  $status.textContent = STATUS[live.status] || "";
+  if (live.active && live.status === "joining") { $head.textContent = "JOINING"; $list.innerHTML = ""; $overlay.classList.remove("gone"); }
+  if (live.active && !myId) { myId = await playerId(); setMyId(myId); }
+});
+on("live-results", showWaiting);
+on("live-standing", () => { if (!$overlay.classList.contains("gone")) $list.innerHTML = rows(live.standings); });
+on("live-leave", () => { document.body.classList.remove("live"); });
+
+$("liveleave").addEventListener("click", e => { e.stopPropagation(); leaveLive(); });
+$("liveexit").addEventListener("click", e => { e.stopPropagation(); leaveLive(); });
