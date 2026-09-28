@@ -35,11 +35,11 @@ export function loadTrack(seed) {
 }
 
 /** Begin a run: reset, start the 3-2-1, and hand control to the loop. */
-export function start() {
+export function start(ticks = 3) {
   resetRace(track.samples[0]);
   acc = 0; last = performance.now();
-  race.countdown = 3 * T_TICK; race.goTimer = 0;
-  emit("countdown", 3);
+  race.countdown = ticks * T_TICK; race.goTimer = 0;
+  emit("countdown", ticks);
   resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
   race.running = true;
   emit("race-start");
