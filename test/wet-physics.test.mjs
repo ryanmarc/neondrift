@@ -14,7 +14,9 @@ const { PHYSICS_DT } = await import(new URL("config/tuning.js", root));
 const { weatherFor } = await import(new URL("track/weather.js", root));
 
 // A fixed drive on a fixed dry track: its exact time and final pose. Captured
-// before wet physics existed; any change to the dry path moves these.
+// before wet physics existed; any change to the dry path moves these. Re-pinned
+// when the track builders moved to core/fmath.js: the samples moved by under
+// 1e-10px (the last bit of sin/cos), the times didn't move at all.
 function fingerprint(seed) {
   loadTrackGeometry(seed);
   const { schedule } = bootstrap({ hold: 18, horizon: 120, edge: 6, speed: 120, laps: 1 });
@@ -23,7 +25,7 @@ function fingerprint(seed) {
   return { time: r.time, x: last.x, y: last.y, a: last.a, boost: last.boost, mult: last.mult };
 }
 
-const DRY_PIN = [{"time":10.933333333333353,"x":1025.7864286008746,"y":52.39275460998299,"a":7.86923389028134,"boost":0.7367996756887888,"mult":1.9158333333333644},{"time":16.999999999999677,"x":-550.9957720166949,"y":559.392923403932,"a":8.55800391889112,"boost":0.5729081371934801,"mult":3.9024999999999848}];
+const DRY_PIN = [{"time":10.933333333333353,"x":1025.786428600874,"y":52.39275460998253,"a":7.86923389028134,"boost":0.7367996756887888,"mult":1.9158333333333644},{"time":16.999999999999677,"x":-550.9957720166913,"y":559.3929234039349,"a":8.558003918891123,"boost":0.5729081371934802,"mult":3.9024999999999848}];
 
 test("the dry path is bit-for-bit what it was before wet physics", () => {
   forceWeather(null);

@@ -3,6 +3,7 @@
 // sample. Pure: everything comes from the rng that is passed in.
 
 import { TAU, lerp } from "../core/math.js";
+import { sin, cos, atan2, hypot } from "../core/fmath.js";
 import { STEP, GUIDE } from "../config/tuning.js";
 
 /**
@@ -15,13 +16,13 @@ export function trackFromAmps(R0, amps) {
   for (let i = 0; i < M; i++) {
     const th = i / M * TAU;
     let m = 1;
-    for (const h of amps) m += h.a * Math.sin(h.k * th + h.p);
+    for (const h of amps) m += h.a * sin(h.k * th + h.p);
     const r = R0 * m;
-    raw.push({ x: Math.cos(th) * r, y: Math.sin(th) * r });
+    raw.push({ x: cos(th) * r, y: sin(th) * r });
   }
   // arc-length resample to STEP px spacing
   let total = 0; const cum = [0];
-  for (let i = 1; i <= M; i++) { const a = raw[i - 1], b = raw[i % M]; total += Math.hypot(b.x - a.x, b.y - a.y); cum.push(total); }
+  for (let i = 1; i <= M; i++) { const a = raw[i - 1], b = raw[i % M]; total += hypot(b.x - a.x, b.y - a.y); cum.push(total); }
   const count = Math.max(500, Math.round(total / STEP));
   const S = []; let j = 0;
   for (let i = 0; i < count; i++) {
@@ -43,14 +44,14 @@ export function finishSamples(S, length) {
   // tangent + normal
   for (let i = 0; i < S.length; i++) {
     const a = S[(i - 1 + S.length) % S.length], b = S[(i + 1) % S.length];
-    let tx = b.x - a.x, ty = b.y - a.y; const L = Math.hypot(tx, ty) || 1; tx /= L; ty /= L;
+    let tx = b.x - a.x, ty = b.y - a.y; const L = hypot(tx, ty) || 1; tx /= L; ty /= L;
     S[i].tx = tx; S[i].ty = ty; S[i].nx = -ty; S[i].ny = tx;
   }
   // curvature: how tight, and how often the turn direction flips
   let minR = 1e9, flips = 0, prev = 0;
   for (let i = 0; i < S.length; i++) {
     const a = S[i], b = S[(i + 1) % S.length];
-    let d = Math.atan2(b.ty, b.tx) - Math.atan2(a.ty, a.tx);
+    let d = atan2(b.ty, b.tx) - atan2(a.ty, a.tx);
     while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU;
     S[i].curv = d;
     if (Math.abs(d) > 1e-4) minR = Math.min(minR, STEP / Math.abs(d));
@@ -86,6 +87,16 @@ export function cornerCount(S) {
   return n;
 }
 
+// 0.95^n for n = 0..24, as V8 rounds Math.pow for it. Firefox rounds 0.95^4
+// one bit differently, and any last bit can move a track (core/fmath.js).
+const SHRINK = [
+  1, 0.95, 0.9025, 0.8573749999999999, 0.8145062499999999, 0.7737809374999998, 0.7350918906249998,
+  0.6983372960937497, 0.6634204312890623, 0.6302494097246091, 0.5987369392383787, 0.5688000922764597,
+  0.5403600876626367, 0.5133420832795048, 0.48767497911552954, 0.46329123015975304, 0.44012666865176536,
+  0.4181203352191771, 0.3972143184582182, 0.37735360253530725, 0.3584859224085419, 0.3405616262881148,
+  0.323533544973709, 0.3073568677250236, 0.2919890243387724,
+];
+
 /**
  * Search for a layout that is drivable (min radius > shape.minR, 185px) and
  * interesting (at least 4 direction changes, and at least shape.corners real
@@ -114,7 +125,7 @@ export function buildTrack(rng, shape = {}) {
     let scale = 0.46 / sum;
     for (let shrink = 0; shrink < 9; shrink++) {
       // shrink tight high harmonics faster than the broad shape-defining ones
-      const amps = base.map(h => ({ k: h.k, a: h.a * scale * Math.pow(scale < 1 ? 0.95 : 1, Math.max(0, h.k - 4) * shrink), p: h.p }));
+      const amps = base.map(h => ({ k: h.k, a: h.a * scale * (scale < 1 ? SHRINK[Math.max(0, h.k - 4) * shrink] : 1), p: h.p }));
       const t = trackFromAmps(R0, amps);
       const score = corners ? cornerCount(t.S) : t.flips;   // what the fallback ranks by
       if (t.minR > minR && t.flips >= 4 && (!corners || score >= corners)) return finish(t, amps);

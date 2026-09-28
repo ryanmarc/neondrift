@@ -13,6 +13,7 @@
 // straight between them.
 
 import { TAU } from "../core/math.js";
+import { sin, cos, atan2, acos, hypot } from "../core/fmath.js";
 import { STEP, GUIDE } from "../config/tuning.js";
 import { finishSamples, cornerCount, buildTrack } from "./generator.js";
 
@@ -121,11 +122,11 @@ function poses(segs) {
     out.push({ x, y, h });
     if (s.R) {
       const k = s.phi / segLen(s);
-      x += (Math.sin(h + s.phi) - Math.sin(h)) / k;
-      y -= (Math.cos(h + s.phi) - Math.cos(h)) / k;
+      x += (sin(h + s.phi) - sin(h)) / k;
+      y -= (cos(h + s.phi) - cos(h)) / k;
       h += s.phi;
     } else {
-      x += Math.cos(h) * s.L; y += Math.sin(h) * s.L;
+      x += cos(h) * s.L; y += sin(h) * s.L;
     }
   }
   out.push({ x, y, h });
@@ -142,10 +143,10 @@ function poses(segs) {
  * ~400px whatever the straight before it, which this gives.
  */
 const LINE_R = 560, LINE_W = 100;
-export const drivableR = phi => Math.max(R_FLOOR, LINE_R + LINE_W - 2 * LINE_W / (1 - Math.cos(Math.min(Math.PI, Math.abs(phi)) / 2)));
+export const drivableR = phi => Math.max(R_FLOOR, LINE_R + LINE_W - 2 * LINE_W / (1 - cos(Math.min(Math.PI, Math.abs(phi)) / 2)));
 
 /** The widest turn (radians) a corner of radius R can be driven through: drivableR inverted. */
-const drivablePhi = R => (R >= LINE_R ? Math.PI * 2 : 2 * Math.acos(Math.max(-1, 1 - 2 * LINE_W / (LINE_R + LINE_W - R))));
+const drivablePhi = R => (R >= LINE_R ? Math.PI * 2 : 2 * acos(Math.max(-1, 1 - 2 * LINE_W / (LINE_R + LINE_W - R))));
 
 /** Same-direction corners closer than this are one corner to the car: it can't straighten between them. */
 const MERGE = 250;
@@ -244,11 +245,11 @@ function closeLap(segs, dir, why = () => {}) {
   let end = endOf();
   for (let iter = 0; iter < 12 && free.length >= 3; iter++) {
     const r = [end.x, end.y, end.h - dir * TAU];
-    if (Math.hypot(r[0], r[1]) < 0.5 && Math.abs(r[2]) < 1e-7) break;
+    if (hypot(r[0], r[1]) < 0.5 && Math.abs(r[2]) < 1e-7) break;
     // Jacobian columns: d(end x, end y, end heading) per unit change of each lever
     const P = poses(segs), idx = new Map(segs.map((s, i) => [s, i]));
     const cols = free.map(f => {
-      if (!f.arc) { const h = P[idx.get(f.s)].h; return [Math.cos(h), Math.sin(h), 0]; }
+      if (!f.arc) { const h = P[idx.get(f.s)].h; return [cos(h), sin(h), 0]; }
       const v = get(f), eps = 1e-5;
       set(f, v + eps); const e2 = endOf(); set(f, v);
       return [(e2.x - end.x) / eps, (e2.y - end.y) / eps, (e2.h - end.h) / eps];
@@ -267,7 +268,7 @@ function closeLap(segs, dir, why = () => {}) {
       if (v !== want) { free.splice(k, 1); clamped = true; }
     }
     end = endOf();
-    if (!clamped && Math.hypot(end.x, end.y) < 0.5 && Math.abs(end.h - dir * TAU) < 1e-7) break;
+    if (!clamped && hypot(end.x, end.y) < 0.5 && Math.abs(end.h - dir * TAU) < 1e-7) break;
   }
   if (Math.abs(end.h - dir * TAU) > 1e-6) { why(free.length < 3 ? "levers-clamped" : "no-converge"); return null; }
   return { x: end.x, y: end.y };
@@ -292,7 +293,7 @@ function sample(segs, start, rot, gap) {
   const P = poses(segs), lens = segs.map(segLen);
   const total = lens.reduce((a, b) => a + b, 0);
   const M = Math.ceil(total / 6);
-  const c = Math.cos(rot), sn = Math.sin(rot);
+  const c = cos(rot), sn = sin(rot);
   const raw = [];
   let k = 0, acc = 0;
   for (let i = 0; i < M; i++) {
@@ -302,17 +303,17 @@ function sample(segs, start, rot, gap) {
     let x, y;
     if (s.R) {
       const kap = s.phi / lens[k];
-      x = p.x + (Math.sin(p.h + kap * t) - Math.sin(p.h)) / kap;
-      y = p.y - (Math.cos(p.h + kap * t) - Math.cos(p.h)) / kap;
+      x = p.x + (sin(p.h + kap * t) - sin(p.h)) / kap;
+      y = p.y - (cos(p.h + kap * t) - cos(p.h)) / kap;
     } else {
-      x = p.x + Math.cos(p.h) * t; y = p.y + Math.sin(p.h) * t;
+      x = p.x + cos(p.h) * t; y = p.y + sin(p.h) * t;
     }
     x -= gap.x * d / total; y -= gap.y * d / total;
     raw.push({ x: x * c - y * sn, y: x * sn + y * c });
   }
   // arc-length resample, starting `start` px along the (unsheared) lap
   const cum = [0];
-  for (let i = 1; i <= M; i++) { const a = raw[i - 1], b = raw[i % M]; cum.push(cum[i - 1] + Math.hypot(b.x - a.x, b.y - a.y)); }
+  for (let i = 1; i <= M; i++) { const a = raw[i - 1], b = raw[i % M]; cum.push(cum[i - 1] + hypot(b.x - a.x, b.y - a.y)); }
   const len = cum[M], s0 = start / total * len;
   const count = Math.max(500, Math.round(len / STEP));
   const S = [];
@@ -357,8 +358,8 @@ function outline(segs, step) {
       const t = i / n * len;
       if (s.R) {
         const kap = s.phi / len;
-        out.push({ x: p.x + (Math.sin(p.h + kap * t) - Math.sin(p.h)) / kap, y: p.y - (Math.cos(p.h + kap * t) - Math.cos(p.h)) / kap });
-      } else out.push({ x: p.x + Math.cos(p.h) * t, y: p.y + Math.sin(p.h) * t });
+        out.push({ x: p.x + (sin(p.h + kap * t) - sin(p.h)) / kap, y: p.y - (cos(p.h + kap * t) - cos(p.h)) / kap });
+      } else out.push({ x: p.x + cos(p.h) * t, y: p.y + sin(p.h) * t });
     }
   });
   return out;
@@ -686,7 +687,7 @@ export function buildDriftTrack(rng, family, shape = {}, stats = null) {
     if (total * k0 > LAP_CAP) { why("long"); if (extra > 0) extra--; continue; }   // too long: back off the extras
     if (k0 !== 1) for (const s of segs) { if (s.R) s.R *= k0; else s.L *= k0; }
     if (!drivable(segs, why)) { why("drivable"); continue; }
-    if (Math.hypot(gap.x, gap.y) > SHEAR_MAX * total) { why("position"); continue; }
+    if (hypot(gap.x, gap.y) > SHEAR_MAX * total) { why("position"); continue; }
     // the start line sits on the longest straight, whichever the closure made it
     let at = 0, run = 0, pos = 0;
     for (const s of segs) { if (!s.R && s.L > run) { run = s.L; at = pos + START_AT * s.L; } pos += segLen(s); }

@@ -357,6 +357,7 @@ That is what keeps the graph acyclic; keep it that way when adding features.
 ```
 js/main.js              entry: loadTrack, resize, run
 js/core/    math.js     clamp, lerp, TAU, wrapAngle
+            fmath.js    sin, cos, atan2, acos, hypot with the same bits in every engine — the track builders' math
             random.js   mulberry32, hashStr
             events.js   on(name, fn) / emit(name, payload) — event list at top of file
             storage.js  localStorage that never throws
@@ -461,6 +462,16 @@ Conventions:
   sampled centerline. Change the generator and every seed produces a new id, so
   stale ghosts can never appear on a track they weren't set on. Don't "simplify"
   this back to a date key.
+- **Track builders never call engine-rounded `Math`.** Engines round
+  `Math.sin`, `cos`, `atan2`, `acos`, `hypot` and `pow` their own way, and the
+  layout search turns a last-bit difference into a different track: Firefox
+  built 2026-09-28 as `1G0U22H` while Chrome and the worker built `112VFL5`,
+  and its posts failed with `track-mismatch`. `generator.js` and `layouts.js`
+  use `core/fmath.js` (fdlibm, plus V8's hypot; only `+ − × ÷` and `sqrt`,
+  which IEEE fixes) and a table for `0.95^n`. It reproduces every existing id;
+  `test/fmath.test.mjs` pins the ids and fmath's bits, and fails if a builder
+  calls one of those `Math` functions again. The physics still uses `Math`: a
+  replay already matches across engines within the worker's tolerances.
 - **The generator's default path is pinned.** `buildTrack(rng, shape)` with no
   shape must draw the same rng values and accept the same candidate as it
   always has, or every stored track id, ghost and leaderboard time is orphaned.
