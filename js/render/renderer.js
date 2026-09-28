@@ -3,7 +3,7 @@
 
 import { $ } from "../core/dom.js";
 import { clamp, lerp, wrapAngle } from "../core/math.js";
-import { LAPS } from "../config/tuning.js";
+import { LAPS, CAR_SCALE } from "../config/tuning.js";
 import { track } from "../track/track.js";
 import { guides } from "../track/guides.js";
 import { line } from "../sim/line.js";
@@ -11,6 +11,7 @@ import { car, race } from "../game/state.js";
 import { ghost, ghostAt } from "../game/ghost.js";
 import { peers, peerPose } from "../game/peers.js";
 import { camera, updateCamera } from "./camera.js";
+import { carById, drawCarShape, garage } from "./cars.js";
 import { createRain, rainCount, stepRain, drawRain } from "./rain.js";
 
 const COLOR = {
@@ -109,11 +110,11 @@ export function draw(dt, alpha) {
       const q = peerPose(p, now);
       if (!q || !inView(q.x, q.y)) continue;
       cx.globalAlpha = q.alpha;
-      drawCar(q.x, q.y, q.a, COLOR.peerBody, COLOR.peerGlow, true);
+      drawCar(q.x, q.y, q.a, COLOR.peerBody, COLOR.peerGlow, true, NEON);
       cx.save();
       cx.translate(q.x, q.y); cx.rotate(-camera.a); cx.scale(1 / camera.z, 1 / camera.z);
       cx.fillStyle = COLOR.peerLabel;
-      cx.fillText(p.name + "#" + p.tag, 0, -26);
+      cx.fillText(p.name + "#" + p.tag, 0, -26 * CAR_SCALE);
       cx.restore();
       cx.globalAlpha = 1;
     }
@@ -123,16 +124,17 @@ export function draw(dt, alpha) {
   if (gp) {
     const rival = ghost.rival;
     // a rival is rose, your own ghost ice; the HUD's "vs" line carries the name
-    drawCar(gp.x, gp.y, gp.a, rival ? COLOR.rivalBody : COLOR.ghostBody, rival ? COLOR.rivalGlow : COLOR.ghostGlow, true);
+    drawCar(gp.x, gp.y, gp.a, rival ? COLOR.rivalBody : COLOR.ghostBody, rival ? COLOR.rivalGlow : COLOR.ghostGlow, true,
+      rival ? NEON : carById(garage.car));
   }
 
   if (track.wet) {   // the underglow on wet asphalt: a soft pool under the car
     cx.fillStyle = car.boosting ? "rgba(255,197,61,.10)" : "rgba(47,227,255,.08)";
-    cx.beginPath(); cx.ellipse(rx, ry, 34, 22, ra, 0, Math.PI * 2); cx.fill();
+    cx.beginPath(); cx.ellipse(rx, ry, 34 * CAR_SCALE, 22 * CAR_SCALE, ra, 0, Math.PI * 2); cx.fill();
   }
   drawPlume();
   drawSpray();
-  drawCar(rx, ry, ra, COLOR.paper, car.boosting ? COLOR.amber : COLOR.ice, false);
+  drawCar(rx, ry, ra, COLOR.paper, car.boosting ? COLOR.amber : COLOR.ice, false, carById(garage.car));
   cx.restore();
 
   if (track.wet) {
@@ -169,10 +171,10 @@ function drawRoad(runs) {
 function drawTireMarks(inView) {
   const marks = race.marks;
   if (!marks.length) return;
-  cx.lineWidth = 8; cx.strokeStyle = track.wet ? COLOR.tireMarkWet : COLOR.tireMark; cx.beginPath();
+  cx.lineWidth = 8 * CAR_SCALE; cx.strokeStyle = track.wet ? COLOR.tireMarkWet : COLOR.tireMark; cx.beginPath();
   for (const m of marks) {
     if (!inView(m.x, m.y)) continue;
-    const nx = -Math.sin(m.a) * 11, ny = Math.cos(m.a) * 11;
+    const nx = -Math.sin(m.a) * 11 * CAR_SCALE, ny = Math.cos(m.a) * 11 * CAR_SCALE;
     cx.moveTo(m.x + nx, m.y + ny); cx.lineTo(m.x + nx * 0.2, m.y + ny * 0.2);
     cx.moveTo(m.x - nx, m.y - ny); cx.lineTo(m.x - nx * 0.2, m.y - ny * 0.2);
   }
@@ -260,7 +262,7 @@ function drawPlume() {
       const op = (wide ? 0.16 : 0.5) * life * life * t;
       if (op < 0.01) continue;
       cx.strokeStyle = "rgba(255,197,61," + op.toFixed(3) + ")";
-      cx.lineWidth = (3 + 16 * t) * (wide ? 2.4 : 1);
+      cx.lineWidth = (3 + 16 * t) * (wide ? 2.4 : 1) * CAR_SCALE;
       cx.beginPath(); cx.moveTo(a.x, a.y); cx.lineTo(b.x, b.y); cx.stroke();
     }
   }
@@ -271,18 +273,15 @@ function drawSpray() {
   for (const s of race.spray) {
     const life = Math.max(0, s.l);
     cx.fillStyle = "rgba(" + COLOR.spray + "," + (0.10 * life).toFixed(3) + ")";
-    cx.beginPath(); cx.arc(s.x, s.y, 8 + 22 * (1 - life), 0, Math.PI * 2); cx.fill();
+    cx.beginPath(); cx.arc(s.x, s.y, (8 + 22 * (1 - life)) * CAR_SCALE, 0, Math.PI * 2); cx.fill();
   }
 }
 
-function drawCar(x, y, a, body, glow, isGhost) {
-  cx.save(); cx.translate(x, y); cx.rotate(a);
-  cx.shadowColor = glow; cx.shadowBlur = isGhost ? 10 : 26;
-  cx.fillStyle = body;
-  cx.beginPath();
-  cx.moveTo(24, 0); cx.lineTo(4, 11); cx.lineTo(-20, 9);
-  cx.lineTo(-20, -9); cx.lineTo(4, -11); cx.closePath(); cx.fill();
-  cx.shadowBlur = 0;
-  if (!isGhost) { cx.fillStyle = "rgba(5,6,11,.65)"; cx.fillRect(-6, -6, 11, 12); }
+// Every car goes through the garage's catalogue at CAR_SCALE. A ghost is its
+// outline only, in its tint; your car gets the details (glass, lights).
+const NEON = carById("neon");
+function drawCar(x, y, a, body, glow, isGhost, shape) {
+  cx.save(); cx.translate(x, y); cx.rotate(a); cx.scale(CAR_SCALE, CAR_SCALE);
+  drawCarShape(cx, shape, { body, glow, blur: isGhost ? 10 : 26, details: !isGhost });
   cx.restore();
 }

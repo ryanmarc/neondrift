@@ -6,7 +6,7 @@
 
 import { clamp } from "../core/math.js";
 import { emit } from "../core/events.js";
-import { T, GHOST_HZ } from "../config/tuning.js";
+import { T, GHOST_HZ, CAR_SCALE } from "../config/tuning.js";
 import { steer } from "../input/input.js";
 import { car, race } from "./state.js";
 import { integrate, BOOST_IGNITED, WENT_OFF, SLIDING } from "./dynamics.js";
@@ -49,7 +49,7 @@ export function step(dt) {
   if (race.trailAcc >= 1 / 70) {
     race.trailAcc -= 1 / 70;
     const th = Math.cos(car.a), tv = Math.sin(car.a);
-    race.trail.push({ x: car.x - th * 15, y: car.y - tv * 15, l: 1, hot: car.boosting ? 1 : 0 });
+    race.trail.push({ x: car.x - th * 15 * CAR_SCALE, y: car.y - tv * 15 * CAR_SCALE, l: 1, hot: car.boosting ? 1 : 0 });
     if (race.trail.length > 34) race.trail.shift();
   }
   for (const pt of race.trail) pt.l -= dt * 3.2;
@@ -59,7 +59,8 @@ export function step(dt) {
   // world space like the plume so it trails along the path actually driven.
   if (track.wet && ((flags & SLIDING) || car.boosting) && race.spray.length < 60 && Math.random() < 0.5) {
     const th = Math.cos(car.a), tv = Math.sin(car.a), side = Math.random() < 0.5 ? -1 : 1;
-    race.spray.push({ x: car.x - th * 12 - tv * 9 * side, y: car.y - tv * 12 + th * 9 * side, l: 1 });
+    const bx = 12 * CAR_SCALE, sx = 9 * CAR_SCALE * side;
+    race.spray.push({ x: car.x - th * bx - tv * sx, y: car.y - tv * bx + th * sx, l: 1 });
   }
   for (const s of race.spray) s.l -= dt * 1.6;
   while (race.spray.length && race.spray[0].l <= 0) race.spray.shift();
