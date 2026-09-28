@@ -7,7 +7,7 @@
 // before WEATHER_CUTOVER or wet days' posts fail replay.
 
 import { hashStr } from "../core/random.js";
-import { dayNumber } from "./styles.js";
+import { dayNumber, liveRound } from "./styles.js";
 
 /** The first day that can be wet. Earlier days never change. */
 export const WEATHER_CUTOVER = "2026-10-01";
@@ -17,13 +17,13 @@ const wetRoll = seed => hashStr("wx:" + seed) % 5 === 0;   // about one in five
 /**
  * "wet" or "dry" for a seed. A daily and each of its run's stages roll on
  * their own full seed, so a wet daily says nothing about its stages. `rnd-…`
- * (?seed=random) rolls the same way; any other custom string is dry, so
+ * (?seed=random) and `live-<n>` roll the same way; any other custom string is dry, so
  * custom-seed boards keep their times.
  */
 export function weatherFor(seed) {
   const at = seed.indexOf("#run");
   const D = dayNumber(at < 0 ? seed : seed.slice(0, at));
   if (D !== null) return D >= dayNumber(WEATHER_CUTOVER) && wetRoll(seed) ? "wet" : "dry";
-  if (seed.startsWith("rnd-")) return wetRoll(seed) ? "wet" : "dry";
+  if (seed.startsWith("rnd-") || liveRound(seed) !== null) return wetRoll(seed) ? "wet" : "dry";
   return "dry";
 }

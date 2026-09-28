@@ -53,8 +53,8 @@ export function walk(key, i, before = null) {
  * six days show all six and no two days running share one. "2026-10-04#run3"
  * is stage 3 of that day's run: the same walk seeded by the day, so back to
  * back stages always differ, and stage 1 differs from the daily;
- * "rnd-…" (?seed=random) picks by hash; any other string stays legacy so
- * custom-seed boards keep their tracks.
+ * "rnd-…" (?seed=random) picks by hash; "live-<n>" is round n of the live mode: its own walk, so consecutive rounds differ;
+ * any other string stays legacy so custom-seed boards keep their tracks.
  */
 export function styleFor(seed) {
   const at = seed.indexOf("#run");
@@ -67,5 +67,13 @@ export function styleFor(seed) {
     return stage > 0 ? walk(day, stage - 1, daily) : daily;   // a run never opens on the daily's family
   }
   if (seed.startsWith("rnd-")) return FAMILIES[hashStr(seed) % FAMILIES.length];
+  const n = liveRound(seed);
+  if (n !== null) return walk("live", n);   // live rounds: back to back rounds always differ
   return null;
+}
+
+/** The round number of a "live-<n>" seed (n a plain non-negative integer), else null. */
+export function liveRound(seed) {
+  const m = /^live-(0|[1-9]\d*)$/.exec(seed);
+  return m ? +m[1] : null;
 }
