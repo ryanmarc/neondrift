@@ -164,6 +164,7 @@ async function liveRoom(request, env, name) {
   // A script could otherwise mint fresh secrets and connect straight to a room
   // for unbounded attempt budgets, skipping /live/join entirely.
   if (await limited(env.JOIN_LIMIT, request)) return bad("rate-limited", 429);
+  // Forwarded as is: the Room reads cf-connecting-ip off it for its per-IP cap.
   return env.ROOM.get(env.ROOM.idFromName(name)).fetch(request);
 }
 
@@ -183,7 +184,7 @@ export default {
       if (request.method === "GET" && url.pathname.startsWith("/live/room/")) return liveRoom(request, env, url.pathname.slice(11));
       if (request.method === "GET" && url.pathname === "/live/join") {
         if (await limited(env.JOIN_LIMIT, request)) return withCors(() => bad("rate-limited", 429));
-        return withCors(async () => { const room = await joinRoom(env); return room ? json({ room }) : bad("full", 503); });
+        return withCors(async () => { const room = await joinRoom(env, url.searchParams.get("prefer")); return room ? json({ room }) : bad("full", 503); });
       }
       if (request.method === "GET" && url.pathname === "/board") return withCors(() => getBoard(url, env));
       if (request.method === "GET" && url.pathname === "/ghost") return withCors(() => getGhost(url, env));

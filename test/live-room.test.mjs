@@ -166,3 +166,23 @@ test("a new round resets the attempt limit", () => {
   const r = R.handle(room, A, { t: "attempt", round: 101, inputs: INPUTS, time: 13 }, roundStart(101) + 1000, pass);
   assert.equal(r.out[0].msg.ok, true, "new round allows attempt without rate delay");
 });
+
+test("strikes accumulate in a round whose limits were cleared by the roll (the fallback is written back)", () => {
+  const room = roomWith(A);
+  const T1 = roundStart(101) + 1000;
+  R.rollRound(room, T1);                    // limits cleared; A is still in the room
+  let r;
+  for (let i = 0; i <= R.STRIKES_MAX; i++) r = R.handle(room, A, { t: "nonsense" }, T1 + i, pass);
+  assert.equal(r.close, true);
+});
+
+test("idle() names players not seen for longer than maxMs; poses and attempts count as seen", () => {
+  const room = roomWith(A, B);                      // both joined at T0
+  const MAX = 195000;
+  assert.deepEqual(R.idle(room, T0 + MAX, MAX), [], "exactly maxMs is not yet idle");
+  R.handle(room, A, { t: "pose", p: [1, 2, 3, 0.1] }, T0 + 100000, pass);
+  assert.deepEqual(R.idle(room, T0 + MAX + 1, MAX), [B]);
+  R.handle(room, B, attempt(14), T0 + 150000, fail);  // a refused replay is still a sign of life
+  assert.deepEqual(R.idle(room, T0 + MAX + 1, MAX), []);
+  assert.deepEqual(R.idle(room, T0 + 100000 + MAX + 1, MAX), [A]);
+});

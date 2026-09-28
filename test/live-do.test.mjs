@@ -6,8 +6,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fakeD1 } from "./d1.mjs";
 
-const { Room, HELLO_MS } = await import("../worker/src/live.js");
-const { roundAt } = await import(new URL("../js/live/clock.js", import.meta.url));
+const { Room, HELLO_MS, IP_PER_ROOM } = await import("../worker/src/live.js");
+const { roundAt, roundStart, RACING_MS, GRACE_MS, SLOT_MS } = await import(new URL("../js/live/clock.js", import.meta.url));
+
+/** Run `fn` with Date.now() pinned to `ms` (the shell reads the clock itself, as the runtime's alarm() gives it no time). */
+async function at(ms, fn) {
+  const real = Date.now;
+  Date.now = () => ms;
+  try { return await fn(); } finally { Date.now = real; }
+}
+const R = roundAt(Date.now());
+const RACING = roundStart(R) + 30000;                           // 30s into this round's racing
+const RESULTS = roundStart(R) + RACING_MS + GRACE_MS + 1000;    // just after the round's alarm time
 
 const SECRET_A = "a".repeat(32);
 const SECRET_B = "b".repeat(32);
@@ -145,7 +155,7 @@ test("sweep closes an unhelloed socket past HELLO_MS and leaves a younger one; /
 
   room.sweep(base);
   assert.equal(old.readyState, 3);
-  assert.equal(old.closedWith.code, 1008);
+  assert.equal(old.closedWith.code, 4003, "a hello timeout is a retryable drop, not an abuse verdict");
   assert.equal(young.readyState, 1);
 
   const res = await room.fetch(new Request("https://room/count"));
@@ -172,18 +182,90 @@ test("a restored snapshot shows in /count-adjacent standings and a fresh hello's
 
 test("alarm sends results to helloed sockets and re-arms only while players remain", async () => {
   const { room, ctx } = await makeRoom();
-  const a = new FakeSocket(); room.accept(a);
-  await hello(room, a, SECRET_A, "Alpha");
+  const a = new FakeSocket(); room.accept(a, RESULTS - 5000);
+  await at(RESULTS - 5000, () => hello(room, a, SECRET_A, "Alpha"));
   a.sent = [];
 
-  await room.alarm();
+  ctx.alarmAt = null;                     // so the assertion below sees alarm() re-arm, not the hello's arm
+  await at(RESULTS, () => room.alarm());
   assert.ok(a.types().includes("results"));
   assert.ok(ctx.alarmAt !== null);
 
   ctx.alarmAt = null;
   await room.webSocketClose(a, 1000, "bye");
-  await room.alarm();
+  await at(RESULTS, () => room.alarm());
   assert.equal(ctx.alarmAt, null);
+});
+
+test("an alarm that fires late, inside the next round's racing, sends no results but still re-arms", async () => {
+  const { room, ctx } = await makeRoom();
+  const a = new FakeSocket(); room.accept(a, RACING);
+  await at(RACING, () => hello(room, a, SECRET_A, "Alpha"));
+  a.sent = [];
+  ctx.alarmAt = null;
+  await at(RACING + 1000, () => room.alarm());
+  assert.ok(!a.types().includes("results"));
+  assert.ok(ctx.alarmAt !== null);
+});
+
+test("alarm closes a player idle for over a round with 4002 and keeps an active one", async () => {
+  const { room, ctx } = await makeRoom();
+  const t0 = RESULTS - SLOT_MS - 5000;
+  const idle = new FakeSocket(); room.accept(idle, t0);
+  await at(t0, () => hello(room, idle, SECRET_A, "Alpha"));
+  const busy = new FakeSocket(); room.accept(busy, t0);
+  await at(t0, () => hello(room, busy, SECRET_B, "Bravo"));
+  await at(RESULTS - 20000, () => room.webSocketMessage(busy, JSON.stringify({ t: "pose", p: [1, 2, 3, 0.5] })));
+  busy.sent = [];
+
+  await at(RESULTS, () => room.alarm());
+  assert.equal(idle.closedWith?.code, 4002);
+  assert.equal(busy.readyState, 1);
+  assert.equal(room.room.players.size, 1);
+  assert.ok(busy.types().includes("leave"), "the others hear the idle player leave");
+  assert.ok(ctx.alarmAt !== null);
+});
+
+test("a pose sent while the hello's D1 lookup is pending is dropped, and the hello still completes", async () => {
+  const DB = stallableDB();
+  const { room } = await makeRoom({ DB });
+  const ws = new FakeSocket(); room.accept(ws);
+  const resolvePlayerName = DB.stall();
+  const pending = hello(room, ws, SECRET_A, "Alpha");
+  await room.webSocketMessage(ws, JSON.stringify({ t: "pose", p: [0, 0, 0, 0] }));     // the car is already driving
+  await room.webSocketMessage(ws, JSON.stringify({ t: "hello", secret: SECRET_A }));  // a second hello mid-hello: dropped too
+  assert.equal(ws.closedWith, null);
+  resolvePlayerName(null);
+  await pending;
+  assert.equal(ws.closedWith, null);
+  assert.equal(room.room.players.size, 1);
+  assert.equal(ws.json(0).t, "welcome");
+  assert.equal(ws.sent.length, 1);
+});
+
+test("a hello that never completes is still swept with 4003", async () => {
+  const DB = stallableDB();
+  const { room } = await makeRoom({ DB });
+  const base = Date.now();
+  const ws = new FakeSocket(); room.accept(ws, base);
+  DB.stall();
+  hello(room, ws, SECRET_A, "Alpha");   // never resolves
+  await new Promise(r => setTimeout(r, 0));
+  room.sweep(base + HELLO_MS + 1);
+  assert.equal(ws.closedWith?.code, 4003);
+});
+
+test("one IP holds at most IP_PER_ROOM sockets in a room; the next upgrade is refused 429", async () => {
+  const { room } = await makeRoom();
+  const ip = "203.0.113.9";
+  for (let i = 0; i < IP_PER_ROOM; i++) {
+    const ws = new FakeSocket(); room.accept(ws, Date.now(), ip);
+    if (i === 0) await hello(room, ws, SECRET_A, "Alpha");   // a helloed socket still counts against its IP
+  }
+  const res = await room.fetch(new Request("https://room/live/room/room-1", { headers: { upgrade: "websocket", "cf-connecting-ip": ip } }));
+  assert.equal(res.status, 429);
+  assert.equal(room.ipCount(ip), IP_PER_ROOM);
+  assert.equal(room.ipCount("198.51.100.1"), 0);
 });
 
 test("webSocketClose completes the handshake and notifies others with leave", async () => {

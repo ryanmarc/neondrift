@@ -41,7 +41,7 @@ export function join(room, id, name, now) {
   rollRound(room, now);
   const replaced = room.players.has(id);
   if (!replaced && room.players.size >= ROOM_CAP) return { ok: false, replaced: false, out: [] };
-  const p = { id, name, tag: id.slice(0, 4), poses: [] };
+  const p = { id, name, tag: id.slice(0, 4), poses: [], lastSeen: now };
   room.players.set(id, p);
   if (!room.limits.has(id)) room.limits.set(id, { lastAttempt: -Infinity, strikes: 0 });
   const peers = [...room.players.values()].filter(q => q.id !== id).map(info);
@@ -62,7 +62,10 @@ export function handle(room, id, msg, now, verify) {
   const p = room.players.get(id);
   const none = { out: [], dirty: false, close: false };
   if (!p) return none;
-  const lim = room.limits.get(id) || { lastAttempt: -Infinity, strikes: 0 };
+  let lim = room.limits.get(id);
+  // A roll clears the limits of players still in the room: keep the fresh
+  // record, or its strikes would start over on every message.
+  if (!lim) { lim = { lastAttempt: -Infinity, strikes: 0 }; room.limits.set(id, lim); }
   const strike = () => { lim.strikes++; return { out: [], dirty: false, close: lim.strikes > STRIKES_MAX }; };
   if (!msg || typeof msg !== "object") return strike();
 
@@ -71,10 +74,12 @@ export function handle(room, id, msg, now, verify) {
     while (p.poses.length && p.poses[0] <= now - 1000) p.poses.shift();
     if (p.poses.length >= POSE_PER_S) return strike();
     p.poses.push(now);
+    p.lastSeen = now;
     return { out: [{ to: "others", msg: { t: "pose", id, p: msg.p } }], dirty: false, close: false };
   }
 
   if (msg.t === "attempt") {
+    p.lastSeen = now;
     const refuse = reason => ({ out: [{ to: id, msg: { t: "attempt-result", ok: false, reason } }], dirty: false, close: false });
     if (!validInputs(msg.inputs) || !validTime(msg.time)) { lim.strikes++; return refuse("invalid"); }
     if (msg.round !== room.round || !open(room.round, now)) return refuse("closed");
@@ -93,6 +98,11 @@ export function handle(room, id, msg, now, verify) {
   }
 
   return strike();
+}
+
+/** Players not seen (joined, an accepted pose, an attempt) for longer than maxMs. */
+export function idle(room, now, maxMs) {
+  return [...room.players.values()].filter(p => now - p.lastSeen > maxMs).map(p => p.id);
 }
 
 export function resultsMsg(room) {
