@@ -160,3 +160,75 @@ test("replaced by another tab (4000) stops for good", async () => {
     assert.equal(made.length, 1, "no reconnect after being replaced");
   } finally { c.close(); }
 });
+
+test("send() returns false before the first message on a socket and true after", async () => {
+  const { WS, made } = fakeSockets();
+  globalThis.WebSocket = WS;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ room: "room-1" }) });
+  const c = connect(() => ({ t: "hello" }), { onMessage() {}, onStatus() {} }, { baseMs: 100 });
+  try {
+    await tick(); await tick();
+    assert.equal(c.send({ t: "pose" }), false, "no socket yet");
+    made[0]._open();
+    assert.equal(c.send({ t: "pose" }), false, "open, but the hello is not answered yet");
+    assert.deepEqual(made[0].sent, [{ t: "hello" }]);
+    made[0]._message({ t: "welcome", now: Date.now(), round: 0, standings: [], peers: [] });
+    assert.equal(c.send({ t: "pose" }), true);
+    assert.deepEqual(made[0].sent.at(-1), { t: "pose" });
+    made[0]._close(1006);
+    await wait(150); await tick();
+    made[1]._open();
+    assert.equal(c.send({ t: "pose" }), false, "a new socket waits for its own welcome");
+  } finally { c.close(); }
+});
+
+test("close code 4003 (hello timeout) retries through the backoff", async () => {
+  const { WS, made } = fakeSockets();
+  globalThis.WebSocket = WS;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ room: "room-1" }) });
+  const statuses = [];
+  const c = connect(() => ({ t: "hello" }), { onMessage() {}, onStatus: s => statuses.push(s) }, { baseMs: 200 });
+  try {
+    await tick(); await tick();
+    made[0]._open();
+    made[0]._close(4003);
+    assert.equal(statuses.at(-1), "offline");
+    assert.equal(made.length, 1, "not at once");
+    await wait(250); await tick();
+    assert.equal(made.length, 2, "reconnected after the backoff");
+  } finally { c.close(); }
+});
+
+test("close code 4002 (idle) is final with status idle", async () => {
+  const { WS, made } = fakeSockets();
+  globalThis.WebSocket = WS;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ room: "room-1" }) });
+  const statuses = [];
+  const c = connect(() => ({ t: "hello" }), { onMessage() {}, onStatus: s => statuses.push(s) }, { baseMs: 100 });
+  try {
+    await tick(); await tick();
+    made[0]._open();
+    made[0]._message({ t: "welcome", now: Date.now(), round: 0, standings: [], peers: [] });
+    made[0]._close(4002);
+    assert.equal(statuses.at(-1), "idle");
+    await wait(400);
+    assert.equal(made.length, 1, "no reconnect after an idle eviction");
+  } finally { c.close(); }
+});
+
+test("a reconnect asks to rejoin the room it was welcomed in", async () => {
+  const { WS, made } = fakeSockets();
+  globalThis.WebSocket = WS;
+  const urls = [];
+  globalThis.fetch = async (u) => { urls.push(u); return { ok: true, json: async () => ({ room: "room-4" }) }; };
+  const c = connect(() => ({ t: "hello" }), { onMessage() {}, onStatus() {} }, { baseMs: 100 });
+  try {
+    await tick(); await tick();
+    assert.ok(urls[0].endsWith("/live/join"), "the first join has no preference");
+    made[0]._open();
+    made[0]._message({ t: "welcome", now: Date.now(), round: 0, standings: [], peers: [] });
+    made[0]._close(1006);
+    await wait(150); await tick();
+    assert.ok(urls[1].endsWith("/live/join?prefer=room-4"));
+  } finally { c.close(); }
+});
