@@ -402,6 +402,7 @@ js/input/   input.js    steer() from pointer halves + arrow keys + gamepad; emit
 js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
             rain.js     rainCount(W,H), createRain/stepRain/drawRain — the screen-space rain streaks
+            cars.js     the garage's cars as canvas paths; CARS, carById, drawCarShape, `garage` {car} — pure
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
             sfx.js      effects: update(), engineUpdate(); subscribes to game events; re-exports the context API
             engine.js   the engine: stepEngine(model, input, dt, P) is pure (gears, revs, load); createEngine(ctx, bus) builds the nodes
@@ -604,6 +605,14 @@ Conventions:
 | `multOffKeep` | Fraction of the chain above ×1 that survives leaving the road. 0 in the daily race (a full reset); a run's build uses 0.5, and its Off-road tax mod 1. |
 | `slideSpeed` / `boostSteer` / `multSpeed` / `offFree` | Not in `T`: optional keys a run's build sets, read by `integrate()` with stock fallbacks (210, false, 0, 0). Slide speed gate; boost fires while steering; top speed per ×1 of chain; free excursions per stage. |
 | `zoomRange` / `zoomLag` | How far the view pulls back at speed, and seconds to follow a speed change. Set `zoomRange` to 0 to lock the zoom. |
+
+### `CAR_SCALE` — drawn car size
+
+`config/tuning.js`. Every car — yours, ghosts, rivals, live players — is drawn
+at this multiple of the original 44px arrow (1.5: at the phone camera's zoom
+the arrow was ~16px on screen, too small to tell the garage's cars apart).
+The tire marks, plume, spray and wet underglow scale with it. Cosmetic only:
+physics treats the car as a point.
 
 ### `WET` — wet-track multipliers
 

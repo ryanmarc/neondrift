@@ -34,6 +34,12 @@ export const T = {
   zoomLag: 0.60,                // seconds for the zoom to follow a speed change
 };
 
+// ---------- cars ----------
+// Drawn size of every car (your car, ghosts, rivals, live players) and of the
+// effects that hang off it: tire marks, plume, spray, underglow. Cosmetic only —
+// physics treats the car as a point. 1 is the original 44px arrow.
+export const CAR_SCALE = 1.5;
+
 // ---------- wet road ----------
 // Multipliers applied on top of the physics table on a wet track (track.wet,
 // see track/weather.js). Set by test/wet-physics.test.mjs. Dry multiplies by
