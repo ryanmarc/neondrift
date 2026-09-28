@@ -49,11 +49,22 @@ on("live-state", async () => {
   document.body.classList.toggle("live", live.active);
   $status.textContent = STATUS[live.status] || "";
   if (live.active && live.status === "joining") { $head.textContent = "JOINING"; $list.innerHTML = ""; $overlay.classList.remove("gone"); }
+  // welcome arrived mid-results: the overlay is already up (from "joining" above,
+  // or from a reconnect), but it may still show the stale JOINING text/empty
+  // list rather than this round's standings — refresh it from live.standings.
+  if (live.active && live.status === "on" && !$overlay.classList.contains("gone") && !race.running) showWaiting();
   if (live.active && !myId) { myId = await playerId(); setMyId(myId); }
 });
 on("live-results", showWaiting);
 on("live-standing", () => { if (!$overlay.classList.contains("gone")) $list.innerHTML = rows(live.standings); });
-on("live-leave", () => { document.body.classList.remove("live"); });
+on("live-leave", () => {
+  document.body.classList.remove("live");
+  // leaveLive() can fire mid-attempt (Leave, displacement, unavailable): race-start
+  // left "gone" on the overlay and nothing else removes it on this path, so without
+  // this the title screen never reappears. Matches hud.js's track-loaded handling.
+  $overlay.classList.remove("gone", "done");
+  $head.textContent = ""; $list.innerHTML = ""; $next.textContent = "";
+});
 
 $("liveleave").addEventListener("click", e => { e.stopPropagation(); leaveLive(); });
 $("liveexit").addEventListener("click", e => { e.stopPropagation(); leaveLive(); });
