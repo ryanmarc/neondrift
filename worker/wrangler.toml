@@ -29,11 +29,13 @@ class_name = "Room"
 tag = "v1"
 new_sqlite_classes = ["Room"]
 
+# 40, not 20: one connect charges this limit twice (/live/join, then the
+# GET /live/room/<name> upgrade).
 [[unsafe.bindings]]
 name = "JOIN_LIMIT"
 type = "ratelimit"
 namespace_id = "1004"
-simple = { limit = 20, period = 60 }
+simple = { limit = 40, period = 60 }
 
 [[unsafe.bindings]]
 name = "POST_LIMIT"

@@ -13,7 +13,9 @@ import { roundAt, roundStart, RACING_MS, GRACE_MS } from "../../js/live/clock.js
 
 export const MAX_FRAME = 16 * 1024;
 export const ROOM_NAME = /^room-([1-9]\d?)$/;   // room-1 … room-99
+export const HELLO_MS = 10000;   // a socket that never says hello is swept after this long
 const MAX_ROOMS = 50;
+const OPEN = 1;   // WebSocket.readyState: OPEN. Both browsers and workerd use the standard 0/1/2/3 states.
 
 const verify = (seed, inputs, time) => replay(seed, inputs, { claimedTime: time, laps: 1 });
 
@@ -44,14 +46,33 @@ export class Room {
     });
   }
 
+  /** Accept a socket and stamp it with when it arrived, so an unhelloed one can be swept. */
+  accept(ws, now = Date.now()) {
+    this.ctx.acceptWebSocket(ws);
+    ws.serializeAttachment({ at: now });
+  }
+
+  /** Close any socket that has been open more than HELLO_MS without saying hello. */
+  sweep(now) {
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment();
+      if (a && !a.id && now - a.at > HELLO_MS) {
+        try { ws.close(1008, "hello timeout"); } catch { /* already closing */ }
+      }
+    }
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.pathname === "/count") return Response.json({ n: this.room.players.size });
+    const now = Date.now();
+    this.sweep(now);
+    // Open sockets, not joined players: an unhelloed socket still holds a slot
+    // (and would otherwise let /live/join keep sending traffic to a saturated room).
+    if (url.pathname === "/count") return Response.json({ n: this.ctx.getWebSockets().length });
     if (request.headers.get("upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
-    // sockets that never say hello are bounded too
     if (this.ctx.getWebSockets().length >= core.ROOM_CAP + 4) return new Response("full", { status: 503 });
     const pair = new WebSocketPair();
-    this.ctx.acceptWebSocket(pair[1]);
+    this.accept(pair[1], now);
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
@@ -79,7 +100,13 @@ export class Room {
     if (!a || !a.id) {
       if (!msg || msg.t !== "hello" || !validSecret(msg.secret)) return ws.close(1008, "hello first");
       const id = await sha256Hex(msg.secret);
-      const name = core.nameFor(await playerName(this.env.DB, id), msg.name);
+      let stored;
+      try { stored = await playerName(this.env.DB, id); }
+      catch { return ws.close(1011, "lookup failed"); }
+      // The socket may have closed (or been swept) while those awaits were in
+      // flight; joining it now would add a phantom player that never leaves.
+      if (ws.readyState !== OPEN) return;
+      const name = core.nameFor(stored, msg.name);
       const r = core.join(this.room, id, name, now);
       if (!r.ok) return ws.close(4001, "full");
       // The same player on another socket (a second tab): that one goes. Its
@@ -100,7 +127,12 @@ export class Room {
     if (r.close) ws.close(1008, "abuse");
   }
 
-  async webSocketClose(ws) { this.gone(ws); }
+  async webSocketClose(ws, code, reason) {
+    // Completes the closing handshake on the client's initiated close; 1005 is
+    // a reserved "no status" code the client may report but can't be re-sent.
+    try { ws.close(code === 1005 ? 1000 : code, reason); } catch { /* already closed */ }
+    this.gone(ws);
+  }
   async webSocketError(ws) { this.gone(ws); }
 
   gone(ws) {
@@ -118,6 +150,7 @@ export class Room {
 
   async alarm() {
     const now = Date.now();
+    this.sweep(now);
     core.rollRound(this.room, now);
     this.send([{ to: "all", msg: core.resultsMsg(this.room) }]);
     if (this.room.players.size) await this.ensureAlarm(now);   // an empty room lets its alarm lapse and hibernates
