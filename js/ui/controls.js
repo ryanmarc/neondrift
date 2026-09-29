@@ -3,12 +3,13 @@
 import { $ } from "../core/dom.js";
 import { guides } from "../track/guides.js";
 import { line, ensureLine } from "../sim/line.js";
-import { camera } from "../render/camera.js";
+import { camera, nextMode, restoreMode } from "../render/camera.js";
+import { read, write } from "../core/storage.js";
 import { start } from "../game/race.js";
 import * as SFX from "../audio/sfx.js";
 import * as Music from "../audio/music.js";
 import { track } from "../track/track.js";
-import { isDateSeed, todayUtc } from "../config/params.js";
+import { isDateSeed, todayUtc, COCKPIT_FLAG } from "../config/params.js";
 import { run } from "../run/state.js";
 import { startRun } from "../run/run.js";
 import { padState, risingEdges, firstPad, stepIndex, homeIndex } from "../input/gamepad.js";
@@ -58,10 +59,19 @@ for (const b of $fx) b.addEventListener("click", e => { e.stopPropagation(); SFX
 for (const b of $mu) b.addEventListener("click", e => { e.stopPropagation(); SFX.unlock(); Music.toggle(); syncAudioButtons(); });
 syncAudioButtons();
 
+// fixed → chase → cockpit (cockpit only with the flag); remembered across visits.
 const $cam = $("camtoggle");
+const CAM_KEY = "neondrift:camera";
+function setCameraMode(mode) {
+  camera.mode = mode;
+  $cam.textContent = "Camera: " + mode;
+  document.body.classList.toggle("cockpit", mode === "cockpit");   // style.css hides the DOM boost and chain
+}
+setCameraMode(restoreMode(read(CAM_KEY), COCKPIT_FLAG));
 $cam.addEventListener("click", e => {
-  e.stopPropagation(); camera.chase = !camera.chase;
-  $cam.textContent = "Camera: " + (camera.chase ? "chase" : "fixed");
+  e.stopPropagation();
+  setCameraMode(nextMode(camera.mode, COCKPIT_FLAG));
+  write(CAM_KEY, camera.mode);
 });
 
 // ---------- gamepad menus ----------

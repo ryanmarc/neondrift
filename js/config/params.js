@@ -84,6 +84,11 @@ export const GUIDES_FLAG = false || QS.has("guides");
 // Only the button is hidden — the worker's live routes stay up either way.
 export const LIVE_FLAG = false || QS.has("live");
 
+// FEATURE FLAG: the cockpit camera, dark launched. Off by default: the camera
+// button cycles fixed ↔ chase. Append ?cockpit to add the driver's-seat view to
+// the cycle, or flip to true here to launch it.
+export const COCKPIT_FLAG = false || QS.has("cockpit");
+
 
 // Leaderboard API. Served from localhost or a private LAN address (a phone on
 // the same wifi opening http://192.168.x.x:8000) the game talks to the local

@@ -62,7 +62,7 @@ export function draw(dt, alpha) {
 
   cx.save();
   const sx = (Math.random() - 0.5) * race.shake * 14, sy = (Math.random() - 0.5) * race.shake * 14;
-  cx.translate(W / 2 + sx, camera.chase ? H * 0.66 + sy : H / 2 + sy);
+  cx.translate(W / 2 + sx, camera.mode !== "fixed" ? H * 0.66 + sy : H / 2 + sy);
   cx.rotate(camera.a); cx.scale(camera.z, camera.z); cx.translate(-camera.x, -camera.y);
 
   // visible bounds in world space

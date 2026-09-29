@@ -12,7 +12,7 @@ import { guides } from "../track/guides.js";
 import { car, race, resetRace } from "../game/state.js";
 import { unloadGhost } from "../game/ghost.js";
 import { loadTrack, start, setRules } from "../game/race.js";
-import { camera, resetCamera } from "../render/camera.js";
+import { camera, resetCamera, startAngle } from "../render/camera.js";
 import { run } from "./state.js";
 import { buildFrom, canPick, SKIP } from "./mods.js";
 import { offerFor } from "./offer.js";
@@ -40,7 +40,7 @@ function loadStage(n) {
   car.boost = run.build.T.boostCap * run.build.startBoost;   // Kickstart
   race.params = run.build.T;
   camera.spanScale = run.build.spanScale;
-  resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
+  resetCamera(car, startAngle(car));
   run.stage = n;
   run.stages.push({ seed: track.seed, id: track.id, inputs: null, time: null, prog: 0 });
 }

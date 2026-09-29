@@ -11,7 +11,7 @@ export const camera = {
   z: 1,             // zoom (world px → screen px)
   av: 0,            // rotation velocity (the spring state)
   lx: 0, ly: 0,     // smoothed look-ahead offset
-  chase: false,     // false = fixed orientation, true = rotate with travel
+  mode: "fixed",    // "fixed" = upright, "chase" = rotate with travel, "cockpit" = the driver's seat (render/head.js)
   spanScale: 1,     // a run's Wide angle pulls the view in; the run sets it, 1 otherwise
 };
 
@@ -26,10 +26,11 @@ export function resetCamera(car, angle) {
  * W/H is the viewport in CSS px; dt is the frame time in seconds.
  */
 export function updateCamera(car, rx, ry, ra, W, H, dt) {
+  const chase = camera.mode !== "fixed";   // cockpit keeps chase's rules: the rain's drift reads camera.x/y
   // Show more of the world on a bigger viewport. Mapping a fixed world span to the
   // short edge made everything huge on desktop; the clamp leaves phones untouched.
   const vmin = Math.min(W, H);
-  const span = (camera.chase ? CAM.spanChase : CAM.spanFixed) * clamp(vmin / 420, 1, 1.85) * camera.spanScale;
+  const span = (chase ? CAM.spanChase : CAM.spanFixed) * clamp(vmin / 420, 1, 1.85) * camera.spanScale;
   // Zoom tracks actual speed on a slow lag, rather than stepping the moment boost
   // toggles — a binary flag made the view pop in and out at the ends of every boost.
   const sp = Math.hypot(car.vx, car.vy);
@@ -38,7 +39,7 @@ export function updateCamera(car, rx, ry, ra, W, H, dt) {
   const targetZ = vmin / span * (1 - T.zoomRange * t);
   camera.z += (targetZ - camera.z) * (1 - Math.exp(-dt / T.zoomLag));
 
-  const lead = camera.chase ? CAM.leadChase : CAM.leadFixed;
+  const lead = chase ? CAM.leadChase : CAM.leadFixed;
   // The look-ahead is velocity * lead, and velocity swings hard the moment a slide
   // starts — which yanked the camera's aim point backwards and made the pan stall
   // on every tap. Smooth the look-ahead vector itself so the target moves evenly.
@@ -53,7 +54,7 @@ export function updateCamera(car, rx, ry, ra, W, H, dt) {
   // around. Held by a spring, so it trails and settles rather than being welded
   // to the car.
   let target = 0;
-  if (camera.chase) {
+  if (chase) {
     const travel = sp > 60 ? Math.atan2(car.vy, car.vx) : ra;
     const nose = wrapAngle(ra - travel);
     target = -(travel + nose * CAM.face) - Math.PI / 2;
@@ -62,4 +63,25 @@ export function updateCamera(car, rx, ry, ra, W, H, dt) {
   const cdt = Math.min(dt, 1 / 30);
   camera.av += (CAM.freq * CAM.freq * err - 2 * CAM.zeta * CAM.freq * camera.av) * cdt;
   camera.a += camera.av * cdt;
+}
+
+export const MODES = ["fixed", "chase", "cockpit"];
+
+/** The camera button's next mode. Without the flag cockpit is skipped, and a
+ *  cockpit left over from a flagged session goes back to fixed. */
+export function nextMode(mode, allowCockpit) {
+  if (mode === "fixed") return "chase";
+  if (mode === "chase") return allowCockpit ? "cockpit" : "fixed";
+  return "fixed";
+}
+
+/** A stored mode, if it is a mode and still allowed; fixed otherwise. */
+export function restoreMode(stored, allowCockpit) {
+  if (stored === "cockpit") return allowCockpit ? "cockpit" : "fixed";
+  return MODES.includes(stored) ? stored : "fixed";
+}
+
+/** The rotation resetCamera starts from: upright for fixed, behind the car otherwise. */
+export function startAngle(car) {
+  return camera.mode === "fixed" ? 0 : -car.a - Math.PI / 2;
 }

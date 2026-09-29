@@ -11,7 +11,7 @@ import { rebuildGuides } from "../track/guides.js";
 import { car, race, resetRace } from "./state.js";
 import { loadGhost, commitRun } from "./ghost.js";
 import { step } from "./physics.js";
-import { camera, resetCamera } from "../render/camera.js";
+import { resetCamera, startAngle } from "../render/camera.js";
 import { draw } from "../render/renderer.js";
 import * as SFX from "../audio/sfx.js";
 import * as Music from "../audio/music.js";
@@ -40,7 +40,7 @@ export function start(ticks = 3) {
   acc = 0; last = performance.now();
   race.countdown = ticks * T_TICK; race.goTimer = 0;
   emit("countdown", ticks);
-  resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
+  resetCamera(car, startAngle(car));
   race.running = true;
   emit("race-start");
 }

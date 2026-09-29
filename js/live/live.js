@@ -15,7 +15,7 @@ import { loadTrack, start, setRules } from "../game/race.js";
 import { isDaily } from "../game/daily.js";
 import { peers, setPeer, removePeer, clearPeers, clearPoses, addPose } from "../game/peers.js";
 import { WEATHER_PARAM, todayUtc } from "../config/params.js";
-import { camera, resetCamera } from "../render/camera.js";
+import { resetCamera, startAngle } from "../render/camera.js";
 import { ensureSecret, getName } from "../net/identity.js";
 import { live, serverNow } from "./state.js";
 import { roundAt, phaseAt, seedFor, open, entryAction } from "./clock.js";
@@ -68,7 +68,7 @@ function enterRound(r) {
   clearPoses();
   race.running = false;
   resetRace(track.samples[0]);
-  resetCamera(car, camera.chase ? (-car.a - Math.PI / 2) : 0);
+  resetCamera(car, startAngle(car));
   emit("live-round", r);
 }
 
