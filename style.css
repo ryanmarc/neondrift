@@ -357,3 +357,6 @@ body.garage #garage{display:flex}
   box-shadow:0 0 22px rgba(47,227,255,.3),inset 0 0 22px rgba(47,227,255,.09);
 }
 #garagedone:active{background:rgba(47,227,255,.18)}
+
+/* cockpit camera: boost and chain are gauges on the dash (render/interior.js); a run's TIME bar stays */
+body.cockpit #chainrow,body.cockpit #meter,body.cockpit #meterlabel{display:none}

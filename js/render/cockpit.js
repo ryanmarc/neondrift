@@ -7,12 +7,13 @@
 import { clamp } from "../core/math.js";
 import { COCKPIT, CAR_SCALE } from "../config/tuning.js";
 import { track } from "../track/track.js";
-import { race } from "../game/state.js";
+import { car, race } from "../game/state.js";
 import { ghost, ghostAt } from "../game/ghost.js";
 import { peers, peerPose } from "../game/peers.js";
 import { makeCam, toCam, clipPoly, clipSeg, project, NEAR } from "./project.js";
 import { head } from "./head.js";
 import { carById, garage } from "./cars.js";
+import { drawInterior } from "./interior.js";
 
 const COLOR = {
   void: "#05060b", ground: "#070912", grid: "#1a2a4a",
@@ -37,6 +38,18 @@ export function drawCockpit(cx, W, H, rx, ry, ra) {
   addCars(prims, cam);
   paint(cx, cam, prims);
   drawLabels(cx, cam);
+
+  // The car: the world stays level while the car (bonnet and cabin) tilts and
+  // sways with the sideways force, about the bottom centre of the screen — the
+  // seat. Turning right pushes the body out to the left: its left side drops
+  // (an anticlockwise tilt) and the cabin slides right under the eye.
+  cx.save();
+  cx.translate(cam.cx, H);
+  cx.rotate(-head.g * COCKPIT.roll * Math.PI / 180);
+  cx.translate(-cam.cx + head.g * COCKPIT.sway * W, -H);
+  drawBonnet(cx, cam, rx, ry, head.carA);
+  drawInterior(cx, W, H, cam, ra);
+  cx.restore();
 }
 
 function drawSky(cx, W, H, cam) {
@@ -183,4 +196,40 @@ function drawLabels(cx, cam) {
     cx.fillStyle = "rgba(" + COLOR.label + "," + a.toFixed(3) + ")";
     cx.fillText(p.name + "#" + p.tag, s[0], s[1]);
   }
+}
+
+// The bonnet, in 3D and fixed to the car at its drawn angle, so it points where
+// the nose points while the head looks down the road. Car-local u (forward), v
+// (right), z (up) from the car's centre; the nose is at u ≈ 37.5 (24 × CAR_SCALE).
+// Its rear sits under the dash, drawn over it. A rounded nose, two creases, and a
+// stripe along the driver's line (v = seat), so it runs parallel to the view.
+const BONNET = [[4, -18, 15], [26, -15.5, 13], [33, -13, 12.4], [36, -9, 12.1], [37.5, -3, 12],
+  [37.5, 3, 12], [36, 9, 12.1], [33, 13, 12.4], [26, 15.5, 13], [4, 18, 15]];
+
+function drawBonnet(cx, cam, rx, ry, a) {
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const B = ([u, v, z]) => toCam(cam, rx + ca * u - sa * v, ry + sa * u + ca * v, z);
+  const poly = clipPoly(BONNET.map(B));
+  if (!poly) return;
+  const pts = poly.map(p => project(cam, p));
+  let top = Infinity, bot = -Infinity;
+  for (const p of pts) { top = Math.min(top, p[1]); bot = Math.max(bot, p[1]); }
+  cx.beginPath();
+  pts.forEach((p, i) => i ? cx.lineTo(p[0], p[1]) : cx.moveTo(p[0], p[1]));
+  cx.closePath();
+  const g = cx.createLinearGradient(0, top, 0, bot);
+  g.addColorStop(0, "#2a3456"); g.addColorStop(1, "#161c30");   // lit toward the nose
+  cx.fillStyle = g; cx.fill();
+  cx.lineJoin = "round";
+  cx.strokeStyle = car.boosting ? "#ffc53d" : "#2fe3ff"; cx.globalAlpha = 0.6; cx.lineWidth = 2; cx.stroke();
+  cx.globalAlpha = 1;
+  const line = (a3, b3, col, w) => {
+    const s = clipSeg(B(a3), B(b3));
+    if (!s) return;
+    const p = project(cam, s[0]), q = project(cam, s[1]);
+    cx.strokeStyle = col; cx.lineWidth = w;
+    cx.beginPath(); cx.moveTo(p[0], p[1]); cx.lineTo(q[0], q[1]); cx.stroke();
+  };
+  for (const v of [-10, 10]) line([4, v * 1.15, 15.3], [34, v * 0.8, 12.6], "rgba(232,240,255,.16)", 1.5);
+  line([4, COCKPIT.seat, 15.4], [36.8, COCKPIT.seat, 12.2], "#ff2f9e", 3);
 }
