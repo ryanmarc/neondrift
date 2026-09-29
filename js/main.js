@@ -10,6 +10,8 @@ import { track, forceWeather } from "./track/track.js";
 import { ghost } from "./game/ghost.js";
 import { guides } from "./track/guides.js";
 import { camera } from "./render/camera.js";
+import { COCKPIT } from "./config/tuning.js";
+import { head } from "./render/head.js";
 import { line, ensureLine } from "./sim/line.js";
 import { run as runState } from "./run/state.js";
 import { startRun, pick, restart as restartRun, abandon } from "./run/run.js";
@@ -33,5 +35,5 @@ run();
 
 // Poke at live state from the browser console: neon.car, neon.race, neon.track…
 // neon.start(); neon.tick(t) in a loop drives a run with synthetic timestamps (hidden tab only).
-window.neon = { car, race, track, ghost, guides, camera, line, loadTrack, start, tick, ensureLine,
+window.neon = { COCKPIT, head, car, race, track, ghost, guides, camera, line, loadTrack, start, tick, ensureLine,
   run: runState, startRun, pick, restartRun, abandon, live, enterLive, leaveLive };

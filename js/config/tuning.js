@@ -66,6 +66,30 @@ export const CAM = {
   leadFixed: 0.36, leadChase: 0.30,  // look-ahead, in seconds of velocity
 };
 
+// ---------- cockpit camera ----------
+// The driver's-seat view (render/head.js, render/cockpit.js, render/interior.js).
+// World px: the car is ~66px long, so taking it as ~4.4m, 15px ≈ 1m.
+export const COCKPIT = {
+  yaw: 0.6,              // head: 0 = welded to the nose, 1 = all the way to the look point
+  lookT: 0.8,            // the look point is this many seconds ahead at the current speed…
+  lookMin: 180,          // …but never nearer than this (px)
+  lookMax: 70,           // the head never turns further than this off the nose (degrees)
+  yawLag: 0.5,           // seconds for the view to follow the head's target
+  eye: 22,               // eye height (px)
+  seat: -7,              // eye off the car's centreline (px); negative = left-hand drive
+  fov: 80,               // degrees across the screen width
+  boostFov: 8,           // extra degrees while boosting
+  horizon: 0.34,         // horizon as a fraction of the screen height from the top, landscape
+  horizonPortrait: 0.42, // the same on a portrait screen (Task 5 Step 7 checks it)
+  rail: 9,               // edge barrier height (px): under the eye, so corners read over them
+  range: 4200,           // draw distance (px)
+  pillar: 38,            // A-pillar angle off the nose, seen from a centred seat (degrees)
+  roll: 3,               // cabin tilt per unit of sideways force (degrees)
+  sway: 0.012,           // cabin slide per unit, as a fraction of the screen width
+  gRef: 800,             // sideways acceleration counted as one unit (px/s²)
+  gLag: 0.12,            // seconds of smoothing on it: slide transitions spike it
+};
+
 // ---------- drift guides ----------
 // Heuristic, not a solved optimum. Corners come from the track's own curvature.
 // The lead/trail distances come from the car's measured response: a slide takes
