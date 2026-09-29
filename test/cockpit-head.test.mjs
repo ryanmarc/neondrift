@@ -111,3 +111,12 @@ test("the drawn car follows the bend", () => {
   frame(car);
   assert.equal(head.carA, carAngle(head.h, 0, head.dMax));
 });
+
+test("a restart (the car parked while the race runs) doesn't roll the cabin", () => {
+  const car = carOn(10, 500);
+  car.vy = 500;                          // mid-slide, moving sideways
+  frame(car);
+  car.vx = 0; car.vy = 0;                // placeCar on restart: velocity zeroed, race still running
+  frame(car);
+  assert.equal(head.g, 0);
+});

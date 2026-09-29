@@ -76,8 +76,10 @@ export function updateHead(car, { samples, running, rx, ry, ra, W, H, dt, spanSc
   head.dMax = bendLimit(W, H, head.focal);
   head.carA = carAngle(head.h, ra, head.dMax);
 
-  // sideways acceleration in the car's own frame, for body roll
-  if (dt > 0 && running) {
+  // sideways acceleration in the car's own frame, for body roll. Parked (the
+  // countdown, a restart's placeCar zeroing the velocity) there is none: a
+  // restart would otherwise read as a -2g jolt and roll the cabin.
+  if (dt > 0 && running && sp >= 5) {
     const ax = (car.vx - head.pvx) / dt, ay = (car.vy - head.pvy) / dt;
     const lat = (ax * -Math.sin(ra) + ay * Math.cos(ra)) / P.gRef;
     head.g += (clamp(lat, -2, 2) - head.g) * (1 - Math.exp(-dt / P.gLag));

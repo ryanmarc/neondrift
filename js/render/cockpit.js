@@ -1,8 +1,9 @@
 // The race from the driver's seat. Every world primitive is a polygon in world
 // space (x, y on the ground, z up), turned into camera space, clipped to the near
-// plane, projected, and painted far to near. Painting by distance is safe here
-// because drift layouts reject any two stretches of road closer than 420px, so the
-// road never passes over itself.
+// plane and projected. The ground (road, then the markings on it) paints first:
+// a plane under an eye above it can never hide anything standing on it. Only the
+// upright prims (rails, cars) are sorted far to near — sorting the road with them
+// let the road under a ghost's tail paint over the ghost.
 
 import { clamp } from "../core/math.js";
 import { COCKPIT, CAR_SCALE } from "../config/tuning.js";
@@ -97,13 +98,13 @@ function addTrack(prims, cam, W) {
     if (cs[1] > 0 && ct[1] > 0 && Math.sign(cs[0]) === Math.sign(ct[0])
       && Math.abs(cs[0]) > cs[1] * half + margin && Math.abs(ct[0]) > ct[1] * half + margin) continue;
     const k = Math.hypot((cs[0] + ct[0]) / 2, (cs[1] + ct[1]) / 2);
-    prims.push({ k, poly: [L(s, 1, 0), L(t, 1, 0), L(t, -1, 0), L(s, -1, 0)], fill: road });
+    prims.push({ k, layer: 0, poly: [L(s, 1, 0), L(t, 1, 0), L(t, -1, 0), L(s, -1, 0)], fill: road });
     if (first % 24 < 3) {   // a centre dash every ~290px: something to rush past
       const C = (p, o) => toCam(cam, p.x + p.nx * o, p.y + p.ny * o, 0.2);
-      prims.push({ k: k - 0.5, poly: [C(s, 5), C(t, 5), C(t, -5), C(s, -5)], fill: COLOR.dash });
+      prims.push({ k, layer: 1, poly: [C(s, 5), C(t, 5), C(t, -5), C(s, -5)], fill: COLOR.dash });
     }
     for (const side of [1, -1]) {
-      prims.push({ k: k - 1, poly: [L(s, side, 0), L(t, side, 0), L(t, side, COCKPIT.rail), L(s, side, COCKPIT.rail)],
+      prims.push({ k, layer: 2, poly: [L(s, side, 0), L(t, side, 0), L(t, side, COCKPIT.rail), L(s, side, COCKPIT.rail)],
         fill: EDGE[side][1], top: EDGE[side][0] });
     }
   }
@@ -115,13 +116,20 @@ function addStartLine(prims, cam) {
   if (d > COCKPIT.range) return;
   const a = Math.atan2(s0.ty, s0.tx), ca = Math.cos(a), sa = Math.sin(a);
   const P = (u, v) => toCam(cam, s0.x + ca * u - sa * v, s0.y + sa * u + ca * v, 0.1);
-  prims.push({ k: d - 2, poly: [P(-5, -hw), P(5, -hw), P(5, hw), P(-5, hw)], fill: COLOR.startLine });
+  prims.push({ k: d, layer: 1, poly: [P(-5, -hw), P(5, -hw), P(5, hw), P(-5, hw)], fill: COLOR.startLine });
+}
+
+/** Paint order: ground (layer 0 road, 1 markings) in build order, then the
+ *  upright prims (layer 2) far to near by k. */
+export function orderPrims(prims) {
+  const ground = prims.filter(p => p.layer < 2).sort((a, b) => a.layer - b.layer);
+  const upright = prims.filter(p => p.layer === 2).sort((a, b) => b.k - a.k);
+  return ground.concat(upright);
 }
 
 function paint(cx, cam, prims) {
-  prims.sort((a, b) => b.k - a.k);
   cx.lineJoin = "round";
-  for (const p of prims) {
+  for (const p of orderPrims(prims)) {
     const poly = clipPoly(p.poly);
     if (!poly) continue;
     cx.beginPath();
@@ -163,7 +171,7 @@ function addCar(prims, cam, x, y, a, shape, col) {
     [P(f, -wf, 0), P(f, wf, 0), P(f, wf, hf), P(f, -wf, hf)],       // nose
     [P(r, -wr, hr), P(f, -wf, hf), P(f, wf, hf), P(r, wr, hr)],     // roof
   ];
-  for (const poly of faces) prims.push({ k, poly, fill: col, stroke: col });
+  for (const poly of faces) prims.push({ k, layer: 2, poly, fill: col, stroke: col });
 }
 
 function addCars(prims, cam) {
