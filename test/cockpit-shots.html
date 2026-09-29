@@ -1,0 +1,58 @@
+<!doctype html><meta charset="utf-8">
+<!--
+  Manual tool, not part of the suite: drives the cockpit view with a crude
+  steering controller on synthetic frames and lays out canvas snapshots.
+  Serve the repo (python3 serve.py 8001), then:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+      --hide-scrollbars --window-size=1280,1100 --virtual-time-budget=10000 \
+      --screenshot=/tmp/cockpit.png "http://localhost:8001/test/cockpit-shots.html?t=2.5,5,6,8"
+  Params: t=seconds,… (snapshot times)  seed=…  wet  big (one full-size frame)
+          at=<sample index> (start the drive from there instead of the grid; negative counts back from the line)
+          w=…&h=… (the game's viewport, default 1280×720; 390&h=844 for a portrait phone)
+  requestAnimationFrame doesn't run in a headless iframe, so frames are driven
+  with neon.tick(t); snapshots are canvas toDataURL images.
+-->
+<style>body{margin:0;background:#000;color:#fff;font:12px monospace}iframe{border:0}
+#g{display:grid;grid-template-columns:repeat(2,max-content)}#g img{width:640px}.big img{width:auto!important}</style>
+<iframe id="f"></iframe><div id="g"></div><pre id="log"></pre>
+<script>
+const P = new URLSearchParams(location.search);
+const f = document.getElementById("f"), g = document.getElementById("g"), log = document.getElementById("log");
+f.width = P.get("w") || 1280; f.height = P.get("h") || 720;
+if (P.has("big")) { g.className = "big"; g.style.display = "block"; }
+f.src = "../index.html?cockpit&seed=" + (P.get("seed") || "2026-09-28") + (P.has("wet") ? "&weather=wet" : "");
+f.onload = () => setTimeout(go, 800);
+const deg = r => (Math.atan2(Math.sin(r), Math.cos(r)) * 180 / Math.PI).toFixed(0);
+function go() {
+  const w = f.contentWindow, n = w.neon, d = w.document;
+  n.camera.mode = "cockpit";
+  d.getElementById("overlay").style.display = "none";
+  n.start();
+  let held = 0;
+  const key = (type, k) => w.dispatchEvent(new w.KeyboardEvent(type, { key: k }));
+  const set = v => { if (v === held) return; if (held) key("keyup", held > 0 ? "ArrowRight" : "ArrowLeft"); if (v) key("keydown", v > 0 ? "ArrowRight" : "ArrowLeft"); held = v; };
+  const S = n.track.samples, N = S.length, c = n.car;
+  if (P.has("at")) {   // place the car mid-lap, facing along the road, already at speed
+    const i = ((+P.get("at") % N) + N) % N, s0 = S[i], a = Math.atan2(s0.ty, s0.tx);   // negative counts back from the line
+    Object.assign(c, { x: s0.x, y: s0.y, px: s0.x, py: s0.y, a, pa: a, idx: i, vx: Math.cos(a) * 600, vy: Math.sin(a) * 600 });
+  }
+  const shots = (P.get("t") || "3,6,9,12").split(",").map(t => Math.round(+t * 60));
+  let now = w.performance.now(), off = 0;
+  n.tick(now);
+  for (let fr = 1; fr <= shots[shots.length - 1]; fr++) {
+    const t = S[(c.idx + 22) % N];
+    const trav = Math.hypot(c.vx, c.vy) > 60 ? Math.atan2(c.vy, c.vx) : c.a;
+    let e = Math.atan2(t.y - c.y, t.x - c.x) - trav; e = Math.atan2(Math.sin(e), Math.cos(e));
+    set(e > 0.12 ? 1 : e < -0.12 ? -1 : 0);
+    now += 1000 / 60;
+    try { n.tick(now); } catch (err) { log.textContent += `ERR frame ${fr}: ${err.stack}\n`; break; }
+    if (c.off) off++;
+    if (shots.includes(fr)) {
+      const img = new Image(); img.src = d.getElementById("c").toDataURL(); g.appendChild(img);
+      log.textContent += `t=${fr / 60}s prog=${c.prog.toFixed(3)} off=${c.off} head=${deg(n.head.h - c.a)}° car=${deg(n.head.carA - c.a)}° g=${n.head.g.toFixed(2)} held=${held}\n`;
+    }
+  }
+  log.textContent += `off-frames=${off}\n`;
+  f.remove();
+}
+</script>

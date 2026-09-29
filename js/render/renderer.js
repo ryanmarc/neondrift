@@ -13,6 +13,8 @@ import { peers, peerPose } from "../game/peers.js";
 import { camera, updateCamera } from "./camera.js";
 import { carById, drawCarShape, garage } from "./cars.js";
 import { createRain, rainCount, stepRain, drawRain } from "./rain.js";
+import { updateHead } from "./head.js";
+import { drawCockpit } from "./cockpit.js";
 
 const COLOR = {
   void: "#05060b", grid: "#101a2e", road: "#0a0d18",
@@ -56,8 +58,18 @@ export function draw(dt, alpha) {
   const rx = lerp(car.px, car.x, alpha), ry = lerp(car.py, car.y, alpha);
   const ra = car.pa + wrapAngle(car.a - car.pa) * alpha;
 
-  updateCamera(car, rx, ry, ra, W, H, dt);
+  updateCamera(car, rx, ry, ra, W, H, dt);   // cockpit too: the rain's drift reads camera.x/y
+  // The head updates in every mode, so switching to cockpit mid-slide starts from
+  // where the head is now, not from wherever it was when cockpit was last on.
+  updateHead(car, { samples: track.samples, running: race.running, rx, ry, ra, W, H, dt,
+    spanScale: camera.spanScale, input: race.lastInput || 0 });
+  if (camera.mode === "cockpit") drawCockpit(cx, W, H, rx, ry, ra);
+  else drawTopDown(rx, ry, ra);
+  drawOverlays(dt);
+}
 
+// The top-down world: fixed or chase camera.
+function drawTopDown(rx, ry, ra) {
   cx.fillStyle = COLOR.void; cx.fillRect(0, 0, W, H);
 
   cx.save();
@@ -136,7 +148,10 @@ export function draw(dt, alpha) {
   drawSpray();
   drawCar(rx, ry, ra, COLOR.paper, car.boosting ? COLOR.amber : COLOR.ice, false, carById(garage.car));
   cx.restore();
+}
 
+// Screen-space effects shared by every camera: rain, and the off-track tint.
+function drawOverlays(dt) {
   if (track.wet) {
     const n = rainCount(W, H);
     if (!rain || rain.drops.length !== n * 3) rain = createRain(n);
