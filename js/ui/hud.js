@@ -15,6 +15,7 @@ import { canGoDay, gotoDay, gotoToday } from "../game/daily.js";
 import { run } from "../run/state.js";
 import { updateRunHud } from "./runhud.js";
 import { live } from "../live/state.js";
+import { chainReadout } from "../game/chain.js";
 import { updateLiveHud } from "./livehud.js";
 
 const $clock = $("clock"), $lap = $("lap"), $delta = $("delta"), $best = $("best");
@@ -49,24 +50,16 @@ export function updateHud() {
   $fill.style.opacity = car.boost < 0.004 ? "0" : "1";
   $fill.classList.toggle("hot", car.boosting);
 
-  if (race.breakT > 0) {
-    $chain.textContent = "×" + race.lostMult.toFixed(1) + (race.keptMult > 1.05 ? " → ×" + race.keptMult.toFixed(1) : " LOST");
-    $chain.className = "broke";
-    $chain.style.opacity = Math.min(1, race.breakT * 1.8).toFixed(2);
-    $chain.style.transform = "scale(" + (1 + 0.14 * race.breakT).toFixed(3) + ")";
-    $meter.classList.toggle("snap", race.breakT > 0.55);
-  } else if (car.mult > 1.05) {
-    // stays on screen the whole time you're chained, so you can watch it build
-    const t = clamp((car.mult - 1) / 3, 0, 1);
-    $chain.textContent = "×" + car.mult.toFixed(1);
-    $chain.className = "";
-    $chain.style.opacity = (0.40 + 0.60 * t).toFixed(2);
-    $chain.style.transform = "scale(" + (1 + 0.16 * t).toFixed(3) + ")";
-    $meter.classList.remove("snap");
-  } else {
-    $chain.style.opacity = 0;
-    $meter.classList.remove("snap");
+  // the chain stays on screen the whole time you're chained, so you can watch it build
+  const ch = chainReadout(race, car);
+  if (ch.state === "idle") $chain.style.opacity = 0;
+  else {
+    $chain.textContent = ch.text + (ch.note ? " " + ch.note : "");
+    $chain.className = ch.state === "broke" ? "broke" : "";
+    $chain.style.opacity = ch.alpha.toFixed(2);
+    $chain.style.transform = "scale(" + ch.scale.toFixed(3) + ")";
   }
+  $meter.classList.toggle("snap", ch.snap);
 }
 
 export function updateCountdown() {
