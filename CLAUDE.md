@@ -40,6 +40,11 @@ below works with it unchanged.
   launched: `LIVE_FLAG` in `config/params.js` is false, so without the param
   nobody sees the button. Only the entry point is hidden; the worker's live
   routes are deployed and answer regardless. Flip the flag to launch.
+- `?cockpit` — add the cockpit camera to the camera button's cycle (fixed →
+  chase → cockpit). Dark launched: `COCKPIT_FLAG` in `config/params.js` is
+  false. The choice is remembered in `neondrift:camera`; a remembered cockpit
+  without the flag comes back as fixed. Rendering only: runs driven in it post
+  like any other.
 - `?weather=wet|dry` — force the weather for testing. A forced run is
   practice: not saved as a best, not posted (the worker replays on the seed's
   own weather). Practice either way, even when the value matches what the
@@ -380,6 +385,7 @@ js/game/    state.js    `car`, `race`, resetRace
             physics.js  step(dt) — integrate() on the live car + marks, plume, recording, events
             race.js     loadTrack, start, tick(now), run — the per-frame orchestration
             peers.js    other live players as ghosts: pose buffers keyed by id, peerPose(p, now) interpolates a fixed delay behind now — pure, the renderer draws it
+            chain.js    chainReadout(race, car): the chain readout's rules, shared by the DOM HUD and the dash gauge — pure
 js/sim/     schedule.js input schedules keyed on track progress; createInput, normalize, mutate
             simulate.js simulate(schedule) and the predictive bootstrap() controller
             search.js   optimize() (annealing) and polish() (coordinate descent)
@@ -403,6 +409,10 @@ js/render/  camera.js   `camera`, resetCamera, updateCamera
             renderer.js resize, draw(dt, alpha)
             rain.js     rainCount(W,H), createRain/stepRain/drawRain — the screen-space rain streaks
             cars.js     the garage's cars as canvas paths; CARS, carById, drawCarShape, `garage` {car} — pure
+            project.js  perspective maths for the cockpit: makeCam, toCam, project, clipPoly, clipSeg — pure
+            head.js     the cockpit camera: `head`, updateHead() — track look-ahead, lag, field of view, car bend, sideways force
+            cockpit.js  drawCockpit(): the world from the seat, painted far to near; the bonnet; body roll
+            interior.js drawInterior(): the cabin in screen space — roof, mirror, pillars, dash, wheel, boost and chain gauges
 js/audio/   context.js  the one AudioContext + master gain: unlock, mute, hidden-tab suspend
             sfx.js      effects: update(), engineUpdate(); subscribes to game events; re-exports the context API
             engine.js   the engine: stepEngine(model, input, dt, P) is pure (gears, revs, load); createEngine(ctx, bus) builds the nodes
@@ -657,6 +667,25 @@ The fixed camera's world span scales with viewport size (clamped to 1.85×), so 
 desktop sees ~3.4× the track area a phone does. Without that, a bigger screen
 just magnified everything instead of showing more.
 
+### `COCKPIT` — the driver's-seat view
+
+`config/tuning.js`. World px; the car is ~66px long, so 15px ≈ 1m. All of it
+can be tried live from the console as `neon.COCKPIT.<knob>`.
+
+| Knob | Does what |
+|---|---|
+| `yaw` | How far the head turns from the nose toward the look point (0–1). |
+| `lookT` / `lookMin` | The look point: this many seconds ahead at the current speed, never nearer than `lookMin` px. |
+| `lookMax` | The most the head turns off the nose (degrees), so a spin doesn't aim the view backwards. |
+| `yawLag` | Seconds for the view to follow. It follows the head only — never the car's own rotation. |
+| `eye` / `seat` | Eye height, and its offset from the centreline (negative = left-hand drive). |
+| `fov` / `boostFov` | Degrees across the screen **width** (so portrait stays wide), plus extra while boosting. Wide angle multiplies it by `camera.spanScale`. |
+| `horizon` / `horizonPortrait` | Horizon height as a fraction of the screen, landscape and portrait. |
+| `rail` | Edge barrier height. Keep it under `eye`. |
+| `range` | Draw distance. The first thing to cut if a phone is slow. |
+| `pillar` | A-pillar angle off the nose, from a centred seat; `seat` skews the pair. |
+| `roll` / `sway` / `gRef` / `gLag` | Cabin tilt (degrees) and slide (fraction of width) per unit of sideways force; the acceleration that counts as one unit; its smoothing. |
+
 ### `GUIDE` — drift marker heuristic (behind `?guides`)
 
 Green line = start holding, dashed white = release. **The heuristic is only the
@@ -764,6 +793,7 @@ by stubbing `navigator.getGamepads`.
 - `neondrift:mute` — sound effects on/off, global
 - `neondrift:music` — music on/off, global
 - `neondrift:car` — the garage's chosen car id, global; unknown or missing is Neon
+- `neondrift:camera` — the camera mode, global: `fixed`, `chase` or `cockpit`; missing, unknown, or `cockpit` without the flag is `fixed`
 - `neondrift:run:<day>:best` — best run for that day, `{ stages, prog, picks }`
 - `neondrift:run:best` — best run ever, the same shape plus `day`
 
@@ -846,6 +876,24 @@ Wrap every read in try/catch and render correctly when storage is empty.
 - **The chain multiplier lives next to the boost bar, not screen centre.** It was
   centred and flashing; it's a boost fill-rate multiplier, so showing it beside
   the bar it affects explains itself without a tutorial.
+- **The cockpit's view turns freely; the car bends.** In a hard slide the
+  head turns ~49° off the nose and the dash cluster (the only boost and chain
+  readout in cockpit) would leave an 80° view. Pinning just the cluster at the
+  edge looked like the car coming apart; limiting the head's turn locked the
+  view to the car's own spin in exactly those slides and felt too fast. So the
+  whole car (bonnet, pillars, dash, wheel) is drawn eased back toward the view
+  past ~34°, and the slip needle on the dash still reads the true angle.
+- **The cockpit head looks at the track ahead, not along the velocity.**
+  Following the velocity only reacts; a point on the road ~0.8s ahead turns
+  the head into a corner before the car gets there, and is steadier mid-slide.
+- **Cockpit rails sit under eye height.** Rails taller than the eye (26px vs
+  17) hid every corner behind a wall; at 9px the road reads over them.
+- **The cabin is solid slate, not see-through, not black.** Black vanished
+  into the night and read as holes; translucent was rejected in playtest.
+  Solid slate with lit edges reads as the car against the world.
+- **Cockpit painting is by distance, with no depth buffer.** It is safe only
+  because drift layouts reject road closer than 420px to itself; a generator
+  that let the road overlap would need a different renderer.
 
 ## Leaderboard worker (`worker/`)
 
@@ -915,6 +963,9 @@ shell (a fake `ctx`), the `/live/*` routes, the peer-ghost interpolation and
 the client's attempt/pose bookkeeping (`test/live-*.test.mjs`).
 `test/live-smoke.mjs` is a manual script against a running `npm run dev`, not
 part of the automated suite.
+`test/cockpit-shots.html` is a manual tool too: served, it drives the cockpit
+view on synthetic frames and lays out canvas snapshots for headless Chrome
+(the file's header has the command).
 
 ## Not built yet
 
@@ -955,3 +1006,7 @@ part of the automated suite.
   players are drawn as Neon. Send the car id in the live `hello` so peers
   draw it, and store it with each posted run so leaderboard and challenge
   ghosts show it (a D1 column, validated against `CARS` ids).
+- **Cockpit v2.** Tire marks, the boost plume and wheel spray; drift-guide
+  markers; a travel-direction marker on the road; chevrons on corner
+  outsides; per-car interiors from the garage; a working rear-view mirror
+  (it is a silhouette). All scoped out of the first cockpit build.
