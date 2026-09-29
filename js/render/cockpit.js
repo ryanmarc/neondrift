@@ -5,16 +5,20 @@
 // road never passes over itself.
 
 import { clamp } from "../core/math.js";
-import { COCKPIT } from "../config/tuning.js";
+import { COCKPIT, CAR_SCALE } from "../config/tuning.js";
 import { track } from "../track/track.js";
 import { race } from "../game/state.js";
+import { ghost, ghostAt } from "../game/ghost.js";
+import { peers, peerPose } from "../game/peers.js";
 import { makeCam, toCam, clipPoly, clipSeg, project, NEAR } from "./project.js";
 import { head } from "./head.js";
+import { carById, garage } from "./cars.js";
 
 const COLOR = {
   void: "#05060b", ground: "#070912", grid: "#1a2a4a",
   road: "#0c1020", roadWet: "#080a16",
   dash: "rgba(232,240,255,.16)", startLine: "rgba(232,240,255,.22)",
+  ghost: "rgba(47,227,255,.30)", rival: "rgba(255,47,158,.45)", peer: "255,197,61", label: "232,240,255",
 };
 // side → [bright top edge, translucent face]; the same sides as the top-down edges
 const EDGE = { 1: ["#2fe3ff", "rgba(47,227,255,.22)"], [-1]: ["#ff2f9e", "rgba(255,47,158,.22)"] };
@@ -30,7 +34,9 @@ export function drawCockpit(cx, W, H, rx, ry, ra) {
   const prims = [];
   addTrack(prims, cam, W);
   addStartLine(prims, cam);
+  addCars(prims, cam);
   paint(cx, cam, prims);
+  drawLabels(cx, cam);
 }
 
 function drawSky(cx, W, H, cam) {
@@ -121,5 +127,60 @@ function paint(cx, cam, prims) {
         cx.beginPath(); cx.moveTo(a[0], a[1]); cx.lineTo(b[0], b[1]); cx.stroke();
       }
     }
+  }
+}
+
+const NEON = carById("neon");
+
+// A car as a low wedge: length from the garage shape's nose and tail, 30px wide,
+// the nose narrower and lower. Translucent faces and a glowing outline, in the
+// same tint the top-down view uses. Rivals and peers are Neon, as top-down.
+function addCar(prims, cam, x, y, a, shape, col) {
+  const c = toCam(cam, x, y, 0);
+  if (c[1] < NEAR || c[1] > COCKPIT.range) return;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const P = (u, v, z) => toCam(cam, x + ca * u - sa * v, y + sa * u + ca * v, z);
+  const f = shape.front * CAR_SCALE, r = shape.rear * CAR_SCALE;   // rear is negative
+  const wr = 15, wf = 9, hr = 16, hf = 10;                          // half-widths and heights, tail and nose
+  const k = Math.hypot(c[0], c[1]) - 3;
+  const faces = [
+    [P(r, -wr, 0), P(r, wr, 0), P(r, wr, hr), P(r, -wr, hr)],       // tail
+    [P(r, wr, 0), P(f, wf, 0), P(f, wf, hf), P(r, wr, hr)],         // right side
+    [P(r, -wr, 0), P(f, -wf, 0), P(f, -wf, hf), P(r, -wr, hr)],     // left side
+    [P(f, -wf, 0), P(f, wf, 0), P(f, wf, hf), P(f, -wf, hf)],       // nose
+    [P(r, -wr, hr), P(f, -wf, hf), P(f, wf, hf), P(r, wr, hr)],     // roof
+  ];
+  for (const poly of faces) prims.push({ k, poly, fill: col, stroke: col });
+}
+
+function addCars(prims, cam) {
+  const gp = ghostAt(race.time);
+  if (gp) {
+    if (ghost.rival) addCar(prims, cam, gp.x, gp.y, gp.a, NEON, COLOR.rival);
+    else addCar(prims, cam, gp.x, gp.y, gp.a, carById(garage.car), COLOR.ghost);
+  }
+  if (!peers.size) return;
+  const now = performance.now();
+  for (const p of peers.values()) {
+    const q = peerPose(p, now);
+    if (q) addCar(prims, cam, q.x, q.y, q.a, NEON, "rgba(" + COLOR.peer + "," + (0.28 * q.alpha).toFixed(3) + ")");
+  }
+}
+
+// Live name labels: above each peer, a fixed screen size, fading with distance
+// and with the peer's own fade.
+function drawLabels(cx, cam) {
+  if (!peers.size) return;
+  const now = performance.now();
+  cx.font = "600 11px 'Chakra Petch', system-ui, sans-serif"; cx.textAlign = "center"; cx.textBaseline = "alphabetic";
+  for (const p of peers.values()) {
+    const q = peerPose(p, now);
+    if (!q) continue;
+    const c = toCam(cam, q.x, q.y, 34);
+    if (c[1] < NEAR * 4 || c[1] > COCKPIT.range) continue;
+    const s = project(cam, c);
+    const a = q.alpha * clamp(1 - c[1] / COCKPIT.range, 0.2, 1) * 0.55;
+    cx.fillStyle = "rgba(" + COLOR.label + "," + a.toFixed(3) + ")";
+    cx.fillText(p.name + "#" + p.tag, s[0], s[1]);
   }
 }
